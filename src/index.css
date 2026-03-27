@@ -1,0 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 98%;
+    --foreground: 213 39% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 39% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 39% 15%;
+
+    --primary: 210 51% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 95%;
+    --secondary-foreground: 213 39% 15%;
+
+    --muted: 210 30% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 55% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 210 51% 36%;
+
+    --radius: 0.75rem;
+
+    /* NexDrive brand tokens */
+    --nexdrive-navy-950: 220 80% 3%;
+    --nexdrive-navy-900: 224 48% 9%;
+    --nexdrive-navy-800: 217 54% 11%;
+    --nexdrive-navy-700: 215 28% 17%;
+    --nexdrive-blue: 210 51% 36%;
+    --nexdrive-blue-light: 210 47% 48%;
+    --nexdrive-blue-glow: 210 60% 55%;
+    --nexdrive-surface-1: 0 0% 100%;
+    --nexdrive-surface-2: 213 47% 97%;
+    --nexdrive-surface-3: 213 35% 95%;
+
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+
+    --gradient-brand: linear-gradient(135deg, hsl(210, 51%, 36%) 0%, hsl(210, 47%, 48%) 50%, hsl(210, 60%, 55%) 100%);
+    --gradient-brand-dark: linear-gradient(135deg, hsl(220, 80%, 3%) 0%, hsl(217, 54%, 11%) 100%);
+    --gradient-premium: linear-gradient(135deg, hsl(210, 51%, 36%) 0%, hsl(210, 55%, 45%) 40%, hsl(200, 60%, 50%) 100%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.9) 0%, hsl(210 30% 98% / 0.7) 100%);
+    --shadow-glow: 0 0 40px hsl(210 60% 55% / 0.3);
+    --shadow-premium: 0 8px 32px hsl(210 51% 36% / 0.12), 0 2px 8px hsl(210 51% 36% / 0.08);
+    --shadow-card: 0 4px 24px hsl(210 51% 36% / 0.08);
+    --shadow-card-hover: 0 20px 60px hsl(210 51% 36% / 0.18), 0 4px 16px hsl(210 51% 36% / 0.1);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 80% 3%;
+    --foreground: 210 40% 98%;
+    --card: 217 54% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 217 54% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 47% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 210 55% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 210 47% 48%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text;
+    -webkit-text-fill-color: transparent;
+    background-image: var(--gradient-brand);
+  }
+
+  .section-dot-pattern {
+    background-image: radial-gradient(circle, hsl(var(--nexdrive-blue) / 0.1) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .glass-card {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: var(--shadow-premium);
+  }
+
+  .premium-border {
+    position: relative;
+  }
+  .premium-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.3), transparent 50%, hsl(var(--primary) / 0.15));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 100% / 0.06) 40%,
+      hsl(0 0% 100% / 0.12) 50%,
+      hsl(0 0% 100% / 0.06) 60%,
+      transparent 100%
+    );
+    animation: shimmer-slide 3s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+}

@@ -1,0 +1,76 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+
+export interface Booking {
+  _id: string;
+  userId: string;
+  carId: string;
+  startDate: string;
+  endDate: string;
+  status: 'PENDING' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  payment: {
+    amount?: number;
+    currency?: string;
+    status?: 'UNPAID' | 'PAID' | 'FAILED' | 'REFUNDED';
+  };
+  contractUrl?: string;
+  image?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useBookings() {
+  return useQuery<Booking[]>({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      const { data } = await api.get('/bookings');
+      return data;
+    },
+  });
+}
+
+export function useBooking(id: string) {
+  return useQuery<Booking>({
+    queryKey: ['bookings', id],
+    queryFn: async () => {
+      const { data } = await api.get(`/bookings/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useUserBookings(userId: string) {
+  return useQuery<Booking[]>({
+    queryKey: ['bookings', 'user', userId],
+    queryFn: async () => {
+      const { data } = await api.get(`/bookings/user/${userId}`);
+      return data;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useConfirmBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.put(`/bookings/${id}/confirm`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
+  });
+}
+
+export function useCancelBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.put(`/bookings/${id}/cancel`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
+  });
+}
