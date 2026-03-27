@@ -6,6 +6,7 @@ import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, Layers, Wifi, WifiOff, Car, RefreshCw, Navigation } from 'lucide-react';
@@ -62,23 +63,19 @@ function getMarkerStatus(
   return 'connected';
 }
 
-// Auto-fit map to markers
-function FitBounds({ positions }: { positions: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (positions.length > 0) {
-      const bounds = L.latLngBounds(positions.map(p => L.latLng(p[0], p[1])));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-    }
-  }, [positions, map]);
-  return null;
-}
-
 const FleetMap = () => {
+  const navigate = useNavigate();
   const { data: telemetry, isLoading: telLoading, refetch: refetchTel } = useFleetTelemetry();
   const { data: deviceStatuses } = useDeviceStatuses();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [connectionFilter, setConnectionFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchTel();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [refetchTel]);
 
   const markers = (telemetry || []).map(s => {
     const status = getMarkerStatus(s, deviceStatuses || []);
@@ -101,28 +98,23 @@ const FleetMap = () => {
   const markersWithGps = filteredMarkers.filter(m => m.payload?.gps);
   const positions: [number, number][] = markersWithGps.map(m => [m.payload.gps!.lat, m.payload.gps!.lng]);
 
-  const defaultCenter: [number, number] = [36.8065, 10.1815]; // Tunisia center
+  const defaultCenter: [number, number] = [33.8869, 9.5375]; // Tunisia strict center
 
   const connectedCount = markers.filter(m => m.markerStatus === 'connected' || m.markerStatus === 'rented').length;
   const disconnectedCount = markers.filter(m => m.markerStatus === 'disconnected').length;
   const noGpsCount = markers.filter(m => m.markerStatus === 'no-gps').length;
+  const noGpsCars = filteredMarkers.filter(m => m.markerStatus === 'no-gps');
 
   return (
-    <div className="flex gap-5 h-[calc(100vh-8rem)] font-inter">
-      {/* Left Panel */}
-      <div className="w-72 flex-shrink-0 space-y-4">
-        {/* Filters */}
-        <Card className="border-dash-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-dash-text flex items-center gap-2">
-              <Filter size={14} className="text-dash-purple" /> Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs text-dash-muted font-medium">Availability</label>
+    <div className="flex flex-col gap-4 h-[calc(100vh-8rem)] font-inter">
+      {/* Top Filter Bar */}
+      <Card className="border-dash-border shrink-0">
+        <CardContent className="p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-dash-muted font-medium">Availability Filter</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 text-xs border-dash-border"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-40 h-9 text-xs border-dash-border"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Vehicles</SelectItem>
                   <SelectItem value="available">Available</SelectItem>
@@ -130,123 +122,159 @@ const FleetMap = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs text-dash-muted font-medium">Connection</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-dash-muted font-medium">Connection Filter</label>
               <Select value={connectionFilter} onValueChange={setConnectionFilter}>
-                <SelectTrigger className="h-9 text-xs border-dash-border"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-40 h-9 text-xs border-dash-border"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="connected">Connected</SelectItem>
                   <SelectItem value="disconnected">Disconnected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchTel()}
-              className="w-full gap-2 cursor-pointer text-xs"
-            >
-              <RefreshCw size={12} /> Refresh
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Stats */}
-        <Card className="border-dash-border">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-dash-muted flex items-center gap-1.5"><Wifi size={12} className="text-emerald-500" /> Connected</span>
-              <span className="font-semibold text-dash-text">{connectedCount}</span>
+            <Button variant="outline" size="icon" onClick={() => refetchTel()} className="mt-5 h-9 w-9 cursor-pointer"><RefreshCw size={14} /></Button>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-center">
+              <div className="flex justify-center items-center gap-1.5 text-emerald-500 font-semibold text-lg"><Wifi size={16} />{connectedCount}</div>
+              <span className="text-[10px] uppercase text-dash-muted font-medium">Connected</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-dash-muted flex items-center gap-1.5"><WifiOff size={12} className="text-red-500" /> Disconnected</span>
-              <span className="font-semibold text-dash-text">{disconnectedCount}</span>
+            <div className="flex flex-col items-center">
+              <div className="flex justify-center items-center gap-1.5 text-red-500 font-semibold text-lg"><WifiOff size={16} />{disconnectedCount}</div>
+              <span className="text-[10px] uppercase text-dash-muted font-medium">Offline</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-dash-muted flex items-center gap-1.5"><Navigation size={12} className="text-gray-400" /> No GPS</span>
-              <span className="font-semibold text-dash-text">{noGpsCount}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Legend */}
-        <Card className="border-dash-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-dash-text flex items-center gap-2">
-              <Layers size={14} className="text-dash-purple" /> Legend
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {(Object.entries(statusConfig) as [MarkerStatus, typeof statusConfig[MarkerStatus]][]).map(([key, config]) => (
-              <div key={key} className="flex items-center gap-2 text-xs">
-                <div className={`w-3 h-3 rounded-full ${config.bg}`} />
-                <span className="text-dash-muted">{config.label}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Map */}
-      <div className="flex-1 rounded-xl overflow-hidden border border-dash-border">
-        {telLoading ? (
-          <div className="w-full h-full flex items-center justify-center bg-dash-bg">
-            <div className="text-center space-y-3">
-              <Skeleton className="h-8 w-48 mx-auto" />
-              <p className="text-sm text-dash-muted">Loading fleet map...</p>
+            <div className="flex flex-col items-center">
+              <div className="flex justify-center items-center gap-1.5 text-dash-muted font-semibold text-lg"><Navigation size={16} />{noGpsCount}</div>
+              <span className="text-[10px] uppercase text-dash-muted font-medium">No GPS</span>
             </div>
           </div>
-        ) : (
-          <MapContainer
-            center={positions.length > 0 ? positions[0] : defaultCenter}
-            zoom={10}
-            className="w-full h-full"
-            style={{ background: '#f8fafc' }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {positions.length > 0 && <FitBounds positions={positions} />}
-            {markersWithGps.map((m) => (
-              <Marker
-                key={m._id}
-                position={[m.payload.gps!.lat, m.payload.gps!.lng]}
-                icon={createCarIcon(statusConfig[m.markerStatus].color)}
-              >
-                <Popup>
-                  <div className="text-sm space-y-2 min-w-[200px] p-1">
-                    <div className="font-semibold text-dash-text text-base">
-                      {m.car ? `${m.car.marque} — ${m.car.matricule}` : 'Unknown Car'}
-                    </div>
-                    <div className="space-y-1 text-xs text-dash-muted">
-                      <div className="flex justify-between">
-                        <span>Status:</span>
-                        <Badge variant="outline" className="text-[9px] font-semibold">
-                          {m.car?.availability?.status || 'N/A'}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Connection:</span>
-                        <span className={m.markerStatus === 'connected' || m.markerStatus === 'rented' ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
-                          {m.markerStatus === 'connected' || m.markerStatus === 'rented' ? '● Connected' : '● Disconnected'}
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4 flex-1 min-h-0">
+        {/* Left Panel: No Location Data Sidebar */}
+        <div className="w-64 flex-shrink-0 flex flex-col h-full">
+          <Card className="border-dash-border flex-1 flex flex-col overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b border-dash-border bg-dash-bg/50">
+              <CardTitle className="text-sm font-semibold text-dash-text flex items-center gap-2">
+                <Navigation size={14} className="text-dash-warning" /> No Location Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 overflow-y-auto flex-1">
+              {noGpsCars.length === 0 ? (
+                <div className="py-8 text-center px-4">
+                  <p className="text-xs text-dash-muted">All filtered vehicles have valid GPS data.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-dash-border">
+                  {noGpsCars.map(car => (
+                    <div key={car._id} className="p-3 hover:bg-dash-bg/50 transition-colors">
+                      <p className="text-sm font-medium text-dash-text">{car.car ? `${car.car.marque} — ${car.car.matricule}` : 'Unknown'}</p>
+                      <p className="text-[10px] text-dash-muted flex justify-between mt-1">
+                        <span>Status: {car.car?.availability?.status || 'N/A'}</span>
+                        <span className={car.markerStatus === 'disconnected' ? 'text-red-500' : 'text-emerald-500'}>
+                          {car.markerStatus === 'disconnected' ? 'Offline' : 'Online'}
                         </span>
-                      </div>
-                      {m.payload.speed != null && (
-                        <div className="flex justify-between"><span>Speed:</span><span className="text-dash-text font-medium">{m.payload.speed} km/h</span></div>
-                      )}
-                      {m.payload.fuelLevel != null && (
-                        <div className="flex justify-between"><span>Fuel:</span><span className="text-dash-text font-medium">{m.payload.fuelLevel}%</span></div>
-                      )}
-                      <div className="flex justify-between"><span>Last update:</span><span className="text-dash-text">{new Date(m.ts).toLocaleString()}</span></div>
+                      </p>
                     </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Map */}
+        <div className="flex-1 rounded-xl overflow-hidden border border-dash-border relative h-full">
+          {telLoading ? (
+            <div className="w-full h-full flex items-center justify-center bg-dash-bg">
+              <div className="text-center space-y-3">
+                <Skeleton className="h-8 w-48 mx-auto" />
+                <p className="text-sm text-dash-muted">Loading fleet map...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <MapContainer
+                center={defaultCenter}
+                zoom={7}
+                className="w-full h-full"
+                style={{ background: '#f8fafc' }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {markersWithGps.map((m) => (
+                  <Marker
+                    key={m._id}
+                    position={[m.payload.gps!.lat, m.payload.gps!.lng]}
+                    icon={createCarIcon(statusConfig[m.markerStatus].color)}
+                  >
+                    <Popup>
+                      <div className="text-sm space-y-2 min-w-[200px] p-1">
+                        <div className="font-semibold text-dash-text text-base border-b border-dash-border pb-1">
+                          {m.car ? `${m.car.marque} — ${m.car.matricule}` : 'Unknown Car'}
+                        </div>
+                        <div className="space-y-1.5 text-xs text-dash-muted pt-1">
+                          <div className="flex justify-between items-center">
+                            <span>Status:</span>
+                            <Badge variant="outline" className="text-[9px] font-semibold">
+                              {m.car?.availability?.status || 'N/A'}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Connection:</span>
+                            <span className={m.markerStatus === 'connected' || m.markerStatus === 'rented' ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
+                              {m.markerStatus === 'connected' || m.markerStatus === 'rented' ? '● Connected' : '● Disconnected'}
+                            </span>
+                          </div>
+                          {m.payload.speed != null && (
+                            <div className="flex justify-between items-center"><span>Speed:</span><span className="text-dash-text font-bold">{m.payload.speed} km/h</span></div>
+                          )}
+                          {m.payload.fuelLevel != null && (
+                            <div className="flex justify-between items-center"><span>Fuel:</span><span className="text-dash-text font-bold">{m.payload.fuelLevel}%</span></div>
+                          )}
+                          <div className="flex flex-col text-[10px] mt-2 pt-2 border-t border-dash-border gap-2">
+                            <div className="flex justify-between items-center">
+                              <span>Last seen:</span>
+                              <span className="text-dash-text font-medium">{new Date(m.ts).toLocaleString()}</span>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="default" 
+                              className="w-full h-7 text-[10px] font-bold mt-1 bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer"
+                              onClick={() => navigate('/dashboard/cars')}
+                            >
+                              <Car size={10} className="mr-1" /> View Car Details
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+
+              {/* Bottom Right Legend Overlay */}
+              <Card className="absolute bottom-4 right-4 z-[1000] border-dash-border bg-white shadow-xl w-48">
+                <CardContent className="p-3 space-y-2">
+                  <div className="text-xs font-bold text-dash-text uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                    <Layers size={12} className="text-dash-purple" /> Map Legend
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        )}
+                  {(Object.entries(statusConfig) as [MarkerStatus, typeof statusConfig[MarkerStatus]][]).map(([key, config]) => (
+                    <div key={key} className="flex items-center gap-2 text-xs">
+                      <div className={`w-3 h-3 rounded-full ${config.bg} shadow-sm border border-black/10`} />
+                      <span className="text-dash-muted font-medium">{config.label}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

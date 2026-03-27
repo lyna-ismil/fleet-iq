@@ -101,20 +101,6 @@ const Sidebar = () => {
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-3">
-        {/* Upgrade banner */}
-        {!collapsed && (
-          <div className="bg-gradient-to-br from-dash-purple to-dash-purple/80 rounded-xl p-4 text-white">
-            <div className="flex items-center gap-2 mb-2">
-              <Crown size={16} />
-              <span className="text-xs font-semibold uppercase tracking-wide">Upgrade to Pro</span>
-            </div>
-            <p className="text-xs text-white/80 mb-3">Get access to all features!</p>
-            <button className="w-full py-2 bg-white text-dash-purple text-xs font-bold rounded-lg hover:bg-white/90 transition-colors cursor-pointer">
-              Get Pro Now!
-            </button>
-          </div>
-        )}
-
         {/* Admin profile */}
         <div className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl bg-dash-bg', collapsed && 'justify-center px-2')}>
           <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">

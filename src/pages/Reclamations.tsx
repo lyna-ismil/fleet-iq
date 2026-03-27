@@ -119,7 +119,6 @@ const Reclamations = () => {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">ID</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">User</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Car</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Message</TableHead>
@@ -132,7 +131,6 @@ const Reclamations = () => {
               <TableBody>
                 {filtered.map((r) => (
                   <TableRow key={r._id} className="hover:bg-dash-bg/60 transition-colors">
-                    <TableCell className="font-mono text-xs text-dash-text">#{r._id.slice(-6)}</TableCell>
                     <TableCell className="text-sm text-dash-text">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">

@@ -17,6 +17,7 @@ export interface Notification {
   idempotencyKey?: string;
   createdAt: string;
   updatedAt: string;
+  user?: { name: string; email: string };
 }
 
 export function useUserNotifications(userId: string) {
@@ -27,6 +28,17 @@ export function useUserNotifications(userId: string) {
       return data;
     },
     enabled: !!userId,
+  });
+}
+
+export function useRecentNotifications() {
+  return useQuery<Notification[]>({
+    queryKey: ['notifications', 'recent'],
+    queryFn: async () => {
+      const { data } = await api.get('/notifications/recent');
+      return data;
+    },
+    refetchInterval: 15000,
   });
 }
 

@@ -50,7 +50,7 @@ const Devices = () => {
 
   const onRegister = async (data: DeviceFormData) => {
     try {
-      await registerDevice.mutateAsync(data);
+      await registerDevice.mutateAsync(data as any);
       toast.success('Device registered successfully');
       setRegisterOpen(false);
       reset();
@@ -124,7 +124,6 @@ const Devices = () => {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Serial Number</TableHead>
-                  <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Device ID</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Paired Car</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Status</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Firmware</TableHead>
@@ -136,7 +135,6 @@ const Devices = () => {
                 {filtered.map((d) => (
                   <TableRow key={d._id} className="hover:bg-dash-bg/60 transition-colors">
                     <TableCell className="font-medium text-dash-text text-sm">{d.serialNumber}</TableCell>
-                    <TableCell className="font-mono text-xs text-dash-muted">{d.deviceId.slice(0, 8)}...</TableCell>
                     <TableCell className="text-xs text-dash-muted">{d.carId ? (cars?.find(c => c._id === d.carId) ? `${cars.find(c => c._id === d.carId)!.marque} — ${cars.find(c => c._id === d.carId)!.matricule}` : d.carId.slice(-8)) : '—'}</TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[d.status]}`}>{d.status}</Badge></TableCell>
                     <TableCell className="text-xs text-dash-muted">{d.firmwareVersion || '—'}</TableCell>
