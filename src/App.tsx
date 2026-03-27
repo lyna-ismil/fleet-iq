@@ -21,6 +21,8 @@ import Reclamations from "./pages/Reclamations.tsx";
 import Devices from "./pages/Devices.tsx";
 import Telemetry from "./pages/Telemetry.tsx";
 import Notifications from "./pages/Notifications.tsx";
+import Settings from "./pages/Settings.tsx";
+import FleetMap from "./pages/FleetMap.tsx";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -52,6 +54,8 @@ const App = () => (
             <Route path="devices" element={<Devices />} />
             <Route path="telemetry" element={<Telemetry />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="map" element={<FleetMap />} />
           </Route>
 
           {/* Catch-all */}

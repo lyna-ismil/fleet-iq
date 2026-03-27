@@ -38,8 +38,10 @@ const Bookings = () => {
 
   const filtered = bookings?.filter(b =>
     b._id.toLowerCase().includes(search.toLowerCase()) ||
-    b.userId.toLowerCase().includes(search.toLowerCase()) ||
-    b.carId.toLowerCase().includes(search.toLowerCase()) ||
+    (b.user?.fullName || b.userId).toLowerCase().includes(search.toLowerCase()) ||
+    (b.user?.email || '').toLowerCase().includes(search.toLowerCase()) ||
+    (b.car?.marque || b.carId).toLowerCase().includes(search.toLowerCase()) ||
+    (b.car?.matricule || '').toLowerCase().includes(search.toLowerCase()) ||
     b.pickupLocation?.toLowerCase().includes(search.toLowerCase())
   ) || [];
 
@@ -103,8 +105,17 @@ const Bookings = () => {
                 {filtered.map((b) => (
                   <TableRow key={b._id} className="hover:bg-dash-bg/60 transition-colors">
                     <TableCell className="font-mono text-xs text-dash-text">#{b._id.slice(-6)}</TableCell>
-                    <TableCell className="font-mono text-xs text-dash-muted">{b.userId.slice(-6)}</TableCell>
-                    <TableCell className="font-mono text-xs text-dash-muted">{b.carId.slice(-6)}</TableCell>
+                    <TableCell className="text-sm text-dash-text">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-dash-purple text-[10px] font-bold">{(b.user?.fullName || '?').charAt(0).toUpperCase()}</span>
+                        </div>
+                        <span className="truncate max-w-[120px]">{b.user?.fullName || b.userId.slice(-6)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-dash-muted">
+                      {b.car ? `${b.car.marque} - ${b.car.matricule}` : b.carId.slice(-6)}
+                    </TableCell>
                     <TableCell className="text-xs text-dash-muted">
                       {new Date(b.startDate).toLocaleDateString()} - {new Date(b.endDate).toLocaleDateString()}
                     </TableCell>
@@ -142,8 +153,8 @@ const Bookings = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div><p className="text-dash-muted text-xs">Booking ID</p><p className="font-mono text-dash-text">#{selected._id.slice(-8)}</p></div>
                 <div><p className="text-dash-muted text-xs">Status</p><Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[selected.status]}`}>{selected.status}</Badge></div>
-                <div><p className="text-dash-muted text-xs">User ID</p><p className="font-mono text-dash-text">{selected.userId.slice(-8)}</p></div>
-                <div><p className="text-dash-muted text-xs">Car ID</p><p className="font-mono text-dash-text">{selected.carId.slice(-8)}</p></div>
+                <div><p className="text-dash-muted text-xs">User</p><p className="text-dash-text font-medium">{selected.user?.fullName || selected.userId.slice(-8)}</p></div>
+                <div><p className="text-dash-muted text-xs">Car</p><p className="text-dash-text font-medium">{selected.car ? `${selected.car.marque} - ${selected.car.matricule}` : selected.carId.slice(-8)}</p></div>
                 <div><p className="text-dash-muted text-xs">Start Date</p><p className="text-dash-text">{new Date(selected.startDate).toLocaleString()}</p></div>
                 <div><p className="text-dash-muted text-xs">End Date</p><p className="text-dash-text">{new Date(selected.endDate).toLocaleString()}</p></div>
                 <div><p className="text-dash-muted text-xs">Pickup</p><p className="text-dash-text">{selected.pickupLocation || '—'}</p></div>

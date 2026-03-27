@@ -1,6 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
+export interface BookingCar {
+  _id: string;
+  marque: string;
+  matricule: string;
+  photo?: string;
+  location?: string;
+}
+
+export interface BookingUser {
+  _id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+}
+
 export interface Booking {
   _id: string;
   userId: string;
@@ -19,6 +34,9 @@ export interface Booking {
   image?: string;
   createdAt: string;
   updatedAt: string;
+  // Enriched fields
+  user?: BookingUser | null;
+  car?: BookingCar | null;
 }
 
 export function useBookings() {

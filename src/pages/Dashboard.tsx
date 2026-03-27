@@ -1,11 +1,12 @@
 import { useCars } from '@/hooks/useCars';
+import { useDeviceStatuses } from '@/hooks/useDevices';
 import { useUsers } from '@/hooks/useUsers';
 import { useBookings } from '@/hooks/useBookings';
 import { useReclamations } from '@/hooks/useReclamations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Car, Users, CalendarCheck, MessageSquareWarning, ArrowUpRight, Plus } from 'lucide-react';
+import { Car, Users, CalendarCheck, MessageSquareWarning, ArrowUpRight, Plus, Wifi } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -27,6 +28,7 @@ const Dashboard = () => {
   const { data: users, isLoading: usersLoading } = useUsers();
   const { data: bookings, isLoading: bookingsLoading } = useBookings();
   const { data: reclamations, isLoading: reclamationsLoading } = useReclamations();
+  const { data: deviceStatuses, isLoading: devicesLoading } = useDeviceStatuses();
 
   const activeBookings = bookings?.filter(b => b.status === 'CONFIRMED' || b.status === 'ACTIVE') || [];
   const openReclamations = reclamations?.filter(r => r.status === 'OPEN') || [];
@@ -37,6 +39,7 @@ const Dashboard = () => {
     { label: 'Total Cars', value: cars?.length || 0, icon: Car, color: 'bg-dash-purple/10 text-dash-purple', loading: carsLoading, link: '/dashboard/cars' },
     { label: 'Total Users', value: users?.length || 0, icon: Users, color: 'bg-dash-info/10 text-dash-info', loading: usersLoading, link: '/dashboard/users' },
     { label: 'Active Bookings', value: activeBookings.length, icon: CalendarCheck, color: 'bg-dash-success/10 text-dash-success', loading: bookingsLoading, link: '/dashboard/bookings' },
+    { label: 'Connected Devices', value: `${deviceStatuses?.filter(d => d.isConnected).length || 0} / ${deviceStatuses?.length || 0}`, icon: Wifi, color: 'bg-emerald-500/10 text-emerald-500', loading: devicesLoading, link: '/dashboard/devices' },
     { label: 'Open Reclamations', value: openReclamations.length, icon: MessageSquareWarning, color: 'bg-dash-danger/10 text-dash-danger', loading: reclamationsLoading, link: '/dashboard/reclamations' },
   ];
 
@@ -57,7 +60,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         {stats.map((stat) => (
           <Link key={stat.label} to={stat.link}>
             <Card className="hover:shadow-md transition-all duration-200 cursor-pointer border-dash-border hover:-translate-y-0.5">
@@ -106,7 +109,7 @@ const Dashboard = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-t border-dash-border">
-                      <th className="text-left px-6 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Car ID</th>
+                      <th className="text-left px-6 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Car</th>
                       <th className="text-left px-4 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Dates</th>
                       <th className="text-left px-4 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Status</th>
                     </tr>
@@ -114,7 +117,7 @@ const Dashboard = () => {
                   <tbody>
                     {recentBookings.map((b) => (
                       <tr key={b._id} className="border-t border-dash-border hover:bg-dash-bg/60 transition-colors">
-                        <td className="px-6 py-3 font-mono text-xs text-dash-text">{b.carId?.slice(-6)}</td>
+                        <td className="px-6 py-3 text-xs text-dash-text font-medium">{b.car ? `${b.car.marque} — ${b.car.matricule}` : b.carId?.slice(-6)}</td>
                         <td className="px-4 py-3 text-xs text-dash-muted">
                           {new Date(b.startDate).toLocaleDateString()} - {new Date(b.endDate).toLocaleDateString()}
                         </td>
@@ -156,6 +159,7 @@ const Dashboard = () => {
                   <thead>
                     <tr className="border-t border-dash-border">
                       <th className="text-left px-6 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">User</th>
+                      <th className="text-left px-4 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Car</th>
                       <th className="text-left px-4 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Message</th>
                       <th className="text-left px-4 py-3 text-xs text-dash-muted font-medium uppercase tracking-wider">Status</th>
                     </tr>
@@ -163,7 +167,8 @@ const Dashboard = () => {
                   <tbody>
                     {recentReclamations.map((r) => (
                       <tr key={r._id} className="border-t border-dash-border hover:bg-dash-bg/60 transition-colors">
-                        <td className="px-6 py-3 font-mono text-xs text-dash-text">{r.userId?.slice(-6)}</td>
+                        <td className="px-6 py-3 text-xs text-dash-text font-medium">{r.user?.fullName || r.userId?.slice(-6)}</td>
+                        <td className="px-4 py-3 text-xs text-dash-muted">{r.car ? `${r.car.marque} — ${r.car.matricule}` : '—'}</td>
                         <td className="px-4 py-3 text-xs text-dash-muted max-w-[200px] truncate">{r.message}</td>
                         <td className="px-4 py-3">
                           <Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[r.status] || 'bg-gray-100 text-gray-600'}`}>

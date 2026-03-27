@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ const navItems = [
   { icon: Cpu, label: 'Devices', path: '/dashboard/devices' },
   { icon: Activity, label: 'Telemetry', path: '/dashboard/telemetry' },
   { icon: Bell, label: 'Notifications', path: '/dashboard/notifications' },
+  { icon: MapPin, label: 'Fleet Map', path: '/dashboard/map' },
   { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 

@@ -1,6 +1,7 @@
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Search, Bell, ChevronDown } from 'lucide-react';
+import { useAdminProfile } from '@/hooks/useAdmin';
+import { Search, Bell, ChevronDown, User, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,13 +21,16 @@ const pageTitles: Record<string, string> = {
   '/dashboard/reclamations': 'Reclamations',
   '/dashboard/devices': 'Devices',
   '/dashboard/telemetry': 'Telemetry',
+  '/dashboard/map': 'Fleet Map',
   '/dashboard/notifications': 'Notifications',
   '/dashboard/settings': 'Settings',
 };
 
 const Header = () => {
   const location = useLocation();
-  const { logout, role } = useAuth();
+  const navigate = useNavigate();
+  const { logout, role, adminId } = useAuth();
+  const { data: adminProfile } = useAdminProfile(adminId);
   const title = pageTitles[location.pathname] || 'Dashboard';
 
   return (
@@ -59,19 +63,27 @@ const Header = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="w-9 h-9 rounded-full bg-dash-purple/10 flex items-center justify-center">
-                <span className="text-dash-purple text-sm font-bold">A</span>
+              <div className="w-9 h-9 rounded-full bg-dash-purple/10 flex items-center justify-center overflow-hidden border border-dash-border">
+                {adminProfile?.photo ? (
+                  <img src={adminProfile.photo.startsWith('http') ? adminProfile.photo : `http://localhost:6001${adminProfile.photo}`} alt="Admin" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-dash-purple text-sm font-bold">{adminProfile?.name?.charAt(0)?.toUpperCase() || 'A'}</span>
+                )}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-dash-text leading-tight">Admin</p>
+                <p className="text-sm font-medium text-dash-text leading-tight">{adminProfile?.name || 'Loading...'}</p>
                 <p className="text-xs text-dash-muted leading-tight">{role || 'ADMIN'}</p>
               </div>
               <ChevronDown size={14} className="text-dash-muted" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem className="cursor-pointer">Profile</DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/dashboard/settings')} className="cursor-pointer">
+              <User size={14} className="mr-2" /> Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/dashboard/settings')} className="cursor-pointer">
+              <Settings size={14} className="mr-2" /> Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-dash-danger cursor-pointer">
               Logout

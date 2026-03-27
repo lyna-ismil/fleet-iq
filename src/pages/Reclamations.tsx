@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { useReclamations, useAssignReclamation, useResolveReclamation, type Reclamation } from '@/hooks/useReclamations';
+import { useReclamations, useReclamation, useAssignReclamation, useResolveReclamation, useUpdateReclamationNote, type Reclamation } from '@/hooks/useReclamations';
 import { useAdmins } from '@/hooks/useAdmins';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, CheckCircle, XCircle, StickyNote, User as UserIcon, Car as CarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -19,41 +19,73 @@ const statusColors: Record<string, string> = {
   REJECTED: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
+const bookingStatusColors: Record<string, string> = {
+  PENDING: 'bg-dash-warning/15 text-amber-700',
+  CONFIRMED: 'bg-dash-info/15 text-blue-700',
+  ACTIVE: 'bg-dash-success/15 text-emerald-700',
+  COMPLETED: 'bg-gray-100 text-gray-600',
+  CANCELLED: 'bg-dash-danger/15 text-red-700',
+  EXPIRED: 'bg-gray-100 text-gray-500',
+};
+
 const Reclamations = () => {
   const { data: reclamations, isLoading, isError, refetch } = useReclamations();
   const { data: admins } = useAdmins();
   const assignReclamation = useAssignReclamation();
   const resolveReclamation = useResolveReclamation();
+  const updateNote = useUpdateReclamationNote();
 
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Reclamation | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assignAdminId, setAssignAdminId] = useState('');
+  const [noteText, setNoteText] = useState('');
+
+  // Fetch full detail when a reclamation is selected
+  const { data: selectedDetail, isLoading: detailLoading } = useReclamation(selectedId || '');
 
   const filtered = reclamations?.filter(r =>
     r.message.toLowerCase().includes(search.toLowerCase()) ||
-    r.userId.toLowerCase().includes(search.toLowerCase()) ||
+    (r.user?.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.user?.email || '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.car?.marque || '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.car?.matricule || '').toLowerCase().includes(search.toLowerCase()) ||
     r._id.toLowerCase().includes(search.toLowerCase())
   ) || [];
 
+  const handleOpenDetail = (r: Reclamation) => {
+    setSelectedId(r._id);
+    setAssignAdminId(r.assignedAdminId || '');
+    setNoteText(r.adminNote || '');
+  };
+
   const handleAssign = async () => {
-    if (!selected || !assignAdminId) return;
+    if (!selectedId || !assignAdminId) return;
     try {
-      await assignReclamation.mutateAsync({ id: selected._id, assignedAdminId: assignAdminId });
+      await assignReclamation.mutateAsync({ id: selectedId, assignedAdminId: assignAdminId });
       toast.success('Reclamation assigned');
-      setSelected(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Assign failed');
     }
   };
 
   const handleResolve = async (status: 'RESOLVED' | 'REJECTED') => {
-    if (!selected) return;
+    if (!selectedId) return;
     try {
-      await resolveReclamation.mutateAsync({ id: selected._id, status });
+      await resolveReclamation.mutateAsync({ id: selectedId, status });
       toast.success(`Reclamation ${status.toLowerCase()}`);
-      setSelected(null);
+      setSelectedId(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Action failed');
+    }
+  };
+
+  const handleSaveNote = async () => {
+    if (!selectedId) return;
+    try {
+      await updateNote.mutateAsync({ id: selectedId, adminNote: noteText });
+      toast.success('Note saved');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Save failed');
     }
   };
 
@@ -89,9 +121,10 @@ const Reclamations = () => {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">ID</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">User</TableHead>
+                  <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Car</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Message</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Status</TableHead>
-                  <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Assigned</TableHead>
+                  <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Admin Note</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium">Created</TableHead>
                   <TableHead className="text-xs text-dash-muted uppercase tracking-wider font-medium text-right">Actions</TableHead>
                 </TableRow>
@@ -100,13 +133,23 @@ const Reclamations = () => {
                 {filtered.map((r) => (
                   <TableRow key={r._id} className="hover:bg-dash-bg/60 transition-colors">
                     <TableCell className="font-mono text-xs text-dash-text">#{r._id.slice(-6)}</TableCell>
-                    <TableCell className="font-mono text-xs text-dash-muted">{r.userId.slice(-6)}</TableCell>
-                    <TableCell className="text-sm text-dash-muted max-w-[250px] truncate">{r.message}</TableCell>
+                    <TableCell className="text-sm text-dash-text">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-dash-purple text-[10px] font-bold">{r.user?.fullName?.charAt(0)?.toUpperCase() || '?'}</span>
+                        </div>
+                        <span className="truncate max-w-[120px]">{r.user?.fullName || 'Unknown'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-dash-muted">
+                      {r.car ? `${r.car.marque} - ${r.car.matricule}` : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-dash-muted max-w-[180px] truncate">{r.message}</TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[r.status]}`}>{r.status}</Badge></TableCell>
-                    <TableCell className="text-xs text-dash-muted">{r.assignedAdminId ? r.assignedAdminId.slice(-6) : '—'}</TableCell>
+                    <TableCell className="text-xs text-dash-muted max-w-[120px] truncate">{r.adminNote || '—'}</TableCell>
                     <TableCell className="text-xs text-dash-muted">{new Date(r.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setAssignAdminId(r.assignedAdminId || ''); }} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(r)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -118,28 +161,110 @@ const Reclamations = () => {
       <p className="text-xs text-dash-muted">Showing {filtered.length} of {reclamations?.length || 0} reclamations</p>
 
       {/* Detail Modal */}
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={!!selectedId} onOpenChange={() => setSelectedId(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-inter">Reclamation Details</DialogTitle></DialogHeader>
-          {selected && (
-            <div className="space-y-4">
+          {detailLoading ? (
+            <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : selectedDetail && (
+            <div className="space-y-5">
+              {/* Status + ID */}
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className={`text-xs font-semibold border ${statusColors[selected.status]}`}>{selected.status}</Badge>
-                <span className="font-mono text-xs text-dash-muted">#{selected._id.slice(-8)}</span>
-              </div>
-              <div className="bg-dash-bg rounded-xl p-4">
-                <p className="text-sm text-dash-text leading-relaxed">{selected.message}</p>
-              </div>
-              {selected.image && (
-                <img src={selected.image} alt="Reclamation attachment" className="rounded-xl max-h-48 object-cover w-full" />
-              )}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-dash-muted text-xs">User</p><p className="font-mono text-dash-text">{selected.userId.slice(-8)}</p></div>
-                <div><p className="text-dash-muted text-xs">Booking</p><p className="font-mono text-dash-text">{selected.bookingId?.slice(-8) || '—'}</p></div>
-                <div><p className="text-dash-muted text-xs">Created</p><p className="text-dash-text">{new Date(selected.createdAt).toLocaleString()}</p></div>
+                <Badge variant="outline" className={`text-xs font-semibold border ${statusColors[selectedDetail.status]}`}>{selectedDetail.status}</Badge>
+                <span className="font-mono text-xs text-dash-muted">#{selectedDetail._id.slice(-8)}</span>
               </div>
 
-              {(selected.status === 'OPEN' || selected.status === 'IN_PROGRESS') && (
+              {/* Message */}
+              <div className="bg-dash-bg rounded-xl p-4">
+                <p className="text-sm text-dash-text leading-relaxed">{selectedDetail.message}</p>
+              </div>
+              {selectedDetail.image && (
+                <img src={selectedDetail.image} alt="Reclamation attachment" className="rounded-xl max-h-48 object-cover w-full" />
+              )}
+
+              {/* User Profile Panel */}
+              <div className="border border-dash-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
+                  <UserIcon size={14} className="text-dash-purple" /> User Info
+                </div>
+                {selectedDetail.user ? (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-dash-muted text-xs">Full Name</p><p className="text-dash-text font-medium">{selectedDetail.user.fullName}</p></div>
+                    <div><p className="text-dash-muted text-xs">Email</p><p className="text-dash-text">{selectedDetail.user.email}</p></div>
+                    <div><p className="text-dash-muted text-xs">Phone</p><p className="text-dash-text">{selectedDetail.user.phone || '—'}</p></div>
+                    <div><p className="text-dash-muted text-xs">Reclamations</p><p className="text-dash-text font-medium">{selectedDetail.userReclamationCount || 0}</p></div>
+                    <div><p className="text-dash-muted text-xs">Rentals</p><p className="text-dash-text font-medium">{selectedDetail.user.nbr_fois_allocation || 0}</p></div>
+                    <div><p className="text-dash-muted text-xs">Status</p><p className="text-dash-text">{selectedDetail.user.status || '—'}</p></div>
+                    {selectedDetail.user.cinImageUrl && (
+                      <div className="col-span-2">
+                        <p className="text-dash-muted text-xs mb-1">CIN Image</p>
+                        <img src={selectedDetail.user.cinImageUrl} alt="CIN" className="rounded-lg max-h-32 object-cover" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-dash-muted">User data unavailable</p>
+                )}
+              </div>
+
+              {/* Car Info Panel */}
+              {selectedDetail.car && (
+                <div className="border border-dash-border rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
+                    <CarIcon size={14} className="text-dash-purple" /> Car Info
+                  </div>
+                  <div className="flex gap-4">
+                    {selectedDetail.car.photo && (
+                      <img src={selectedDetail.car.photo} alt="Car" className="rounded-lg w-24 h-16 object-cover flex-shrink-0" />
+                    )}
+                    <div className="grid grid-cols-2 gap-2 text-sm flex-1">
+                      <div><p className="text-dash-muted text-xs">Marque</p><p className="text-dash-text font-medium">{selectedDetail.car.marque}</p></div>
+                      <div><p className="text-dash-muted text-xs">Matricule</p><p className="text-dash-text font-medium">{selectedDetail.car.matricule}</p></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Note Editor */}
+              <div className="border border-dash-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
+                  <StickyNote size={14} className="text-dash-purple" /> Admin Note
+                </div>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Add a note about this reclamation..."
+                  className="w-full min-h-[80px] p-3 rounded-lg border border-dash-border bg-dash-bg text-sm text-dash-text resize-none focus:outline-none focus:ring-1 focus:ring-dash-purple"
+                />
+                <Button onClick={handleSaveNote} disabled={updateNote.isPending} size="sm" className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
+                  {updateNote.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+                  Save Note
+                </Button>
+              </div>
+
+              {/* User Booking History */}
+              {selectedDetail.userBookings && selectedDetail.userBookings.length > 0 && (
+                <div className="border border-dash-border rounded-xl p-4 space-y-3">
+                  <h4 className="text-sm font-semibold text-dash-text">User Booking History</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedDetail.userBookings.map((b) => (
+                      <div key={b._id} className="flex items-center justify-between p-2.5 rounded-lg bg-dash-bg text-xs">
+                        <div className="space-y-0.5">
+                          <p className="text-dash-text font-medium">{b.car ? `${b.car.marque} - ${b.car.matricule}` : 'Unknown car'}</p>
+                          <p className="text-dash-muted">{new Date(b.startDate).toLocaleDateString()} → {new Date(b.endDate).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-dash-text font-medium">{b.payment?.amount ? `${b.payment.amount} ${b.payment.currency || 'TND'}` : '—'}</span>
+                          <Badge variant="outline" className={`text-[10px] font-semibold ${bookingStatusColors[b.status]}`}>{b.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              {(selectedDetail.status === 'OPEN' || selectedDetail.status === 'IN_PROGRESS') && (
                 <div className="border-t border-dash-border pt-4 space-y-3">
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-dash-text">Assign to Admin</label>

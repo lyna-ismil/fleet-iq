@@ -55,3 +55,22 @@ export function useDeleteDevice() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['devices'] }),
   });
 }
+
+export interface DeviceStatus {
+  vehicleId: string | null;
+  deviceId: string;
+  firmwareVersion: string | null;
+  isConnected: boolean;
+  lastSeen: string | null;
+}
+
+export function useDeviceStatuses() {
+  return useQuery<DeviceStatus[]>({
+    queryKey: ['device-statuses'],
+    queryFn: async () => {
+      const { data } = await api.get('/devices/status/all');
+      return data;
+    },
+    refetchInterval: 30_000,
+  });
+}

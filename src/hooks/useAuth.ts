@@ -42,6 +42,21 @@ export function useAuth() {
     return localStorage.getItem('adminRole') || '';
   }, []);
 
+  const decodedToken = useMemo(() => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return null;
+      const payload = token.split('.')[1];
+      const decoded = JSON.parse(atob(payload));
+      return decoded;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const adminId = decodedToken?.id || decodedToken?.sub || '';
+  const adminEmail = decodedToken?.email || '';
+
   return {
     login: loginMutation.mutate,
     loginAsync: loginMutation.mutateAsync,
@@ -50,5 +65,7 @@ export function useAuth() {
     logout,
     isAuthenticated,
     role,
+    adminId,
+    adminEmail,
   };
 }

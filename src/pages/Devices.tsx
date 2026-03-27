@@ -137,7 +137,7 @@ const Devices = () => {
                   <TableRow key={d._id} className="hover:bg-dash-bg/60 transition-colors">
                     <TableCell className="font-medium text-dash-text text-sm">{d.serialNumber}</TableCell>
                     <TableCell className="font-mono text-xs text-dash-muted">{d.deviceId.slice(0, 8)}...</TableCell>
-                    <TableCell className="text-xs text-dash-muted">{d.carId || '—'}</TableCell>
+                    <TableCell className="text-xs text-dash-muted">{d.carId ? (cars?.find(c => c._id === d.carId) ? `${cars.find(c => c._id === d.carId)!.marque} — ${cars.find(c => c._id === d.carId)!.matricule}` : d.carId.slice(-8)) : '—'}</TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[d.status]}`}>{d.status}</Badge></TableCell>
                     <TableCell className="text-xs text-dash-muted">{d.firmwareVersion || '—'}</TableCell>
                     <TableCell className="text-xs text-dash-muted">{new Date(d.createdAt).toLocaleDateString()}</TableCell>

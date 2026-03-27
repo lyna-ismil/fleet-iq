@@ -9,6 +9,11 @@ export interface Car {
   visite_technique: string;
   date_assurance: string;
   vignette: string;
+  photo?: string;
+  description?: string;
+  cityRestriction: boolean;
+  allowedCities: string[];
+  deviceId?: string | null;
   healthStatus: 'OK' | 'WARN' | 'CRITICAL';
   lastHealthUpdate?: string;
   lastKnownLocation?: { lat: number; lng: number };
@@ -45,8 +50,11 @@ export function useCar(id: string) {
 export function useCreateCar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (car: Partial<Car>) => {
-      const { data } = await api.post('/cars', car);
+    mutationFn: async (carData: FormData | Partial<Car>) => {
+      const isFormData = carData instanceof FormData;
+      const { data } = await api.post('/cars', carData, isFormData ? {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      } : undefined);
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cars'] }),
@@ -56,8 +64,15 @@ export function useCreateCar() {
 export function useUpdateCar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...car }: Partial<Car> & { id: string }) => {
-      const { data } = await api.put(`/cars/${id}`, car);
+    mutationFn: async ({ id, ...rest }: { id: string; [key: string]: any }) => {
+      // Check if we received FormData or plain object
+      if (rest.formData instanceof FormData) {
+        const { data } = await api.put(`/cars/${id}`, rest.formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return data;
+      }
+      const { data } = await api.put(`/cars/${id}`, rest);
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cars'] }),
