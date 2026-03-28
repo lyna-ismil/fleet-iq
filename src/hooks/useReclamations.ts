@@ -111,3 +111,14 @@ export function useUpdateReclamationNote() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reclamations'] }),
   });
 }
+
+export function useDeleteReclamation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.delete(`/reclamations/${id}`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reclamations'] }),
+  });
+}

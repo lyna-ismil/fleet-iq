@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCars, useCreateCar, useUpdateCar, useDeleteCar, type Car } from '@/hooks/useCars';
 import { useDeviceStatuses } from '@/hooks/useDevices';
+import { useCarBookings, type Booking } from '@/hooks/useBookings';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,9 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Search, Car as CarIcon, AlertCircle, Loader2, RefreshCw, Upload, X, Wifi, WifiOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Car as CarIcon, AlertCircle, Loader2, RefreshCw, Upload, X, Wifi, WifiOff, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 const carSchema = z.object({
@@ -43,6 +46,7 @@ const availColors: Record<string, string> = {
 };
 
 const Cars = () => {
+  const location = useLocation();
   const { data: cars, isLoading, isError, refetch } = useCars();
   const { data: deviceStatuses } = useDeviceStatuses();
   const createCar = useCreateCar();
@@ -52,6 +56,7 @@ const Cars = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -63,6 +68,16 @@ const Cars = () => {
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CarFormData>({
     resolver: zodResolver(carSchema),
   });
+
+  useEffect(() => {
+    if (location.state?.openCarId && cars?.length) {
+      const car = cars.find(c => c._id === location.state.openCarId);
+      if (car) {
+        setSelectedCar(car);
+        window.history.replaceState({}, document.title); // clear state
+      }
+    }
+  }, [location.state, cars]);
 
   const openCreate = () => {
     setEditingCar(null);
@@ -258,6 +273,9 @@ const Cars = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => setSelectedCar(car)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer">
+                          <Eye size={14} />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(car)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer">
                           <Pencil size={14} />
                         </Button>
@@ -410,8 +428,149 @@ const Cars = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Car Detail Drawer */}
+      <Sheet open={!!selectedCar} onOpenChange={() => setSelectedCar(null)}>
+        <SheetContent className="w-[450px] sm:max-w-[450px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-inter">Car Details</SheetTitle>
+          </SheetHeader>
+          {selectedCar && <CarDetailContent car={selectedCar} deviceStatuses={deviceStatuses || []} />}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
+
+const bookingStatusColors: Record<string, string> = {
+  PENDING: 'bg-dash-warning/15 text-amber-700',
+  CONFIRMED: 'bg-dash-info/15 text-blue-700',
+  ACTIVE: 'bg-dash-success/15 text-emerald-700',
+  COMPLETED: 'bg-gray-100 text-gray-600',
+  CANCELLED: 'bg-dash-danger/15 text-red-700',
+  EXPIRED: 'bg-gray-100 text-gray-500',
+};
+
+function CarDetailContent({ car, deviceStatuses }: { car: Car; deviceStatuses: any[] }) {
+  const { data: bookings, isLoading: bookingsLoading } = useCarBookings(car._id);
+  const device = deviceStatuses.find(d => d.deviceId === car.deviceId);
+
+  const isTechniqueValid = car.visite_technique && new Date(car.visite_technique) > new Date();
+  const isAssuranceValid = car.date_assurance && new Date(car.date_assurance) > new Date();
+  const isVignetteValid = car.vignette && new Date(car.vignette) > new Date();
+
+  return (
+    <div className="space-y-6 mt-6">
+      {/* Header Info */}
+      <div className="flex items-center gap-4">
+        {car.photo ? (
+          <img src={car.photo.startsWith('http') ? car.photo : `http://localhost:6002${car.photo}`} alt="Car" className="w-20 h-14 object-cover rounded-xl border border-dash-border" />
+        ) : (
+          <div className="w-20 h-14 rounded-xl bg-dash-bg flex items-center justify-center">
+            <CarIcon size={24} className="text-dash-muted" />
+          </div>
+        )}
+        <div>
+          <p className="text-lg font-semibold text-dash-text">{car.marque}</p>
+          <p className="text-sm text-dash-muted">{car.matricule}</p>
+        </div>
+      </div>
+
+      {/* Statuses */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 bg-dash-bg rounded-xl space-y-1 text-center">
+          <p className="text-xs text-dash-muted">Health</p>
+          <Badge variant="outline" className={`text-[10px] font-semibold border mx-auto ${healthColors[car.healthStatus]}`}>{car.healthStatus}</Badge>
+        </div>
+        <div className="p-3 bg-dash-bg rounded-xl space-y-1 text-center">
+          <p className="text-xs text-dash-muted">Availability</p>
+          <Badge variant="outline" className={`text-[10px] font-semibold border mx-auto ${availColors[car.availability?.status]}`}>{car.availability?.status}</Badge>
+        </div>
+      </div>
+
+      {/* Validity Check */}
+      <div className="border border-dash-border rounded-xl p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-dash-text">Registration Validity</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-dash-muted">Visite Technique</span>
+            <span className={isTechniqueValid ? 'text-emerald-600 font-medium' : 'text-dash-danger font-medium'}>
+              {car.visite_technique ? new Date(car.visite_technique).toLocaleDateString() : 'Missing'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-dash-muted">Assurance</span>
+            <span className={isAssuranceValid ? 'text-emerald-600 font-medium' : 'text-dash-danger font-medium'}>
+              {car.date_assurance ? new Date(car.date_assurance).toLocaleDateString() : 'Missing'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-dash-muted">Vignette</span>
+            <span className={isVignetteValid ? 'text-emerald-600 font-medium' : 'text-dash-danger font-medium'}>
+              {car.vignette ? new Date(car.vignette).toLocaleDateString() : 'Missing'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Device Linkage */}
+      <div className="border border-dash-border rounded-xl p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-dash-text flex items-center gap-2">Device Linkage</h4>
+        {car.deviceId ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-dash-muted">Device ID</span><span className="font-mono text-dash-text">{car.deviceId}</span></div>
+            <div className="flex justify-between items-center">
+              <span className="text-dash-muted">Connection</span>
+              {device?.isConnected ? (
+                <Badge variant="outline" className="text-[10px] bg-emerald-500/15 text-emerald-700 border-emerald-500/30 gap-1"><Wifi size={10} /> Online</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] bg-red-500/15 text-red-700 border-red-500/30 gap-1"><WifiOff size={10} /> Offline</Badge>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-dash-muted italic">No OBD-II device linked to this car.</p>
+        )}
+      </div>
+
+      {/* City Restrictions */}
+      {car.cityRestriction && car.allowedCities && car.allowedCities.length > 0 && (
+        <div className="border border-dash-border rounded-xl p-4">
+          <h4 className="text-sm font-semibold text-dash-text mb-2">Allowed Cities</h4>
+          <div className="flex flex-wrap gap-1.5">
+            {car.allowedCities.map((city) => (
+              <Badge key={city} variant="outline" className="text-xs bg-dash-bg text-dash-text border-dash-border">{city}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bookings */}
+      <div className="border-t border-dash-border pt-4">
+        <h4 className="text-sm font-semibold text-dash-text mb-3">Recent Bookings</h4>
+        {bookingsLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+        ) : !bookings?.length ? (
+          <p className="text-xs text-dash-muted">No bookings for this car.</p>
+        ) : (
+          <div className="space-y-2">
+            {bookings.slice(0, 5).map((b) => (
+              <div key={b._id} className="p-3 rounded-lg bg-dash-bg text-xs space-y-1">
+                <div className="flex items-center justify-between mb-1">
+                  <Badge variant="outline" className={`text-[10px] font-semibold ${bookingStatusColors[b.status]}`}>{b.status}</Badge>
+                  <span className="text-dash-muted">{new Date(b.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-dash-text">
+                  <span>From: {new Date(b.startDate).toLocaleDateString()}</span>
+                  <span>To: {new Date(b.endDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default Cars;

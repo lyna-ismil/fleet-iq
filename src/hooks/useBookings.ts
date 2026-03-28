@@ -71,6 +71,17 @@ export function useUserBookings(userId: string) {
   });
 }
 
+export function useCarBookings(carId: string) {
+  return useQuery<Booking[]>({
+    queryKey: ['bookings', 'car', carId],
+    queryFn: async () => {
+      const { data } = await api.get(`/bookings/car/${carId}`);
+      return data;
+    },
+    enabled: !!carId,
+  });
+}
+
 export function useConfirmBooking() {
   const qc = useQueryClient();
   return useMutation({
@@ -87,6 +98,28 @@ export function useCancelBooking() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data } = await api.put(`/bookings/${id}/cancel`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
+  });
+}
+
+export function useUpdateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<Booking> & { id: string }) => {
+      const { data } = await api.put(`/bookings/${id}`, payload);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
+  });
+}
+
+export function useDeleteBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.delete(`/bookings/${id}`);
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),

@@ -25,7 +25,7 @@ const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'];
 const strengthColors = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-emerald-500', 'bg-emerald-600'];
 
 const Settings = () => {
-  const { adminId } = useAuth();
+  const { adminId, setUser } = useAuth();
   const { data: admin, isLoading } = useAdminProfile(adminId);
   const updateAdmin = useUpdateAdmin();
   const uploadPhoto = useUploadAdminPhoto();
@@ -64,8 +64,11 @@ const Settings = () => {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoPreview(URL.createObjectURL(file));
+    const objectUrl = URL.createObjectURL(file);
+    setPhotoPreview(objectUrl);
     try {
+      // Optimistically update the auth user context for Sidebar/Header
+      setUser({ photo: objectUrl });
       await uploadPhoto.mutateAsync({ id: adminId, file });
       toast.success('Photo updated');
     } catch (err: any) {

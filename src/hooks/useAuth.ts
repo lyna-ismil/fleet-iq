@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
 import api from '@/lib/api';
@@ -15,6 +15,7 @@ interface LoginResponse {
 
 export function useAuth() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -24,6 +25,7 @@ export function useAuth() {
     onSuccess: (data) => {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('adminRole', data.role);
+      queryClient.invalidateQueries({ queryKey: ['adminUser'] });
       navigate('/dashboard');
     },
   });
@@ -31,8 +33,9 @@ export function useAuth() {
   const logout = useCallback(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('adminRole');
+    queryClient.removeQueries();
     navigate('/login');
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const isAuthenticated = useMemo(() => {
     return !!localStorage.getItem('accessToken');
@@ -57,6 +60,18 @@ export function useAuth() {
   const adminId = decodedToken?.id || decodedToken?.sub || '';
   const adminEmail = decodedToken?.email || '';
 
+  const { data: user } = useQuery({
+    queryKey: ['adminUser', adminId],
+    queryFn: async () => {
+      if (!adminId) return null;
+      const { data } = await api.get(`/admins/${adminId}`);
+      // Mapping name to fullName to match usage
+      return { ...data, fullName: data.name };
+    },
+    enabled: !!adminId,
+    staleTime: 1000 * 60 * 5,
+  });
+
   return {
     login: loginMutation.mutate,
     loginAsync: loginMutation.mutateAsync,
@@ -67,5 +82,12 @@ export function useAuth() {
     role,
     adminId,
     adminEmail,
+    user,
+    setUser: (updatedFields: any) => {
+      queryClient.setQueryData(['adminUser', adminId], (oldData: any) => ({
+        ...oldData,
+        ...updatedFields,
+      }));
+    }
   };
 }

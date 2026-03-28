@@ -14,6 +14,7 @@ export interface User {
   status: 'ACTIVE' | 'SUSPENDED';
   createdAt: string;
   updatedAt: string;
+  notes?: { _id: string; text: string; createdBy: string; createdAt: string }[];
 }
 
 export function useUsers() {
@@ -64,6 +65,17 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: async (userData: { fullName: string; email: string; phone: string; password: string }) => {
       const { data } = await api.post('/users', userData);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
+}
+
+export function useAddUserNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, text, createdBy }: { id: string; text: string; createdBy?: string }) => {
+      const { data } = await api.post(`/users/${id}/notes`, { text, createdBy });
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),

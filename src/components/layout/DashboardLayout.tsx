@@ -1,18 +1,29 @@
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
 const DashboardLayout = () => {
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebar_collapsed', String(collapsed));
+  }, [collapsed]);
+
   return (
-    <div className="min-h-screen bg-dash-bg">
-      <Sidebar />
-      {/* Main content area — offset by sidebar width. 
-          The sidebar is 250px when expanded, 68px when collapsed.
-          We use ml-[68px] as base since sidebar starts collapsed on narrow and 
-          the sidebar manages its own width. Content adjusts via CSS. */}
-      <div className="ml-[250px] transition-all duration-300" id="dashboard-main">
+    <div className="min-h-screen bg-dash-bg flex">
+      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      {/* Main content area uses margin-left equal to sidebar width to push content. 
+          flex-1 allows it to take up the remaining space appropriately. */}
+      <div 
+        className={`flex-1 transition-all duration-250 ease-in-out ${collapsed ? 'ml-[68px]' : 'ml-[250px]'}`} 
+        id="dashboard-main"
+      >
         <Header />
-        <main className="p-6">
+        <main className="p-6 overflow-x-hidden">
           <Outlet />
         </main>
       </div>

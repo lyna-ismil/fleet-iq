@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useUsers, useUpdateUser, useDeleteUser, useCreateUser, type User } from '@/hooks/useUsers';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useUsers, useUpdateUser, useDeleteUser, useCreateUser, useAddUserNote, type User } from '@/hooks/useUsers';
 import { useUserBookings, type Booking } from '@/hooks/useBookings';
 import { useUserHistory } from '@/hooks/useUserHistory';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +17,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, Users as UsersIcon, AlertCircle, Loader2, RefreshCw, Eye, Trash2, Plus, Lock } from 'lucide-react';
+import { Search, Users as UsersIcon, AlertCircle, Loader2, RefreshCw, Eye, Trash2, Plus, Lock, Pencil, Send } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 const statusBadge: Record<string, string> = {
@@ -43,6 +45,7 @@ const userSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 const Users = () => {
+  const location = useLocation();
   const { data: users, isLoading, isError, refetch } = useUsers();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
@@ -52,10 +55,25 @@ const Users = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
   });
+
+  const { register: registerEdit, handleSubmit: handleEditSubmit, reset: resetEdit, formState: { errors: editErrors } } = useForm<UserFormData>({
+    resolver: zodResolver(userSchema.extend({ password: z.string().optional() })),
+  });
+
+  useEffect(() => {
+    if (location.state?.openUserId && users?.length) {
+      const user = users.find(u => u._id === location.state.openUserId);
+      if (user) {
+        setSelectedUser(user);
+        window.history.replaceState({}, document.title); // clear state
+      }
+    }
+  }, [location.state, users]);
 
   const onCreateUser = async (data: { fullName: string; email: string; phone: string; password: string }) => {
     try {
@@ -66,6 +84,24 @@ const Users = () => {
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Failed to create user');
     }
+  };
+
+  const onEditUser = async (data: any) => {
+    if (!editingUser) return;
+    try {
+      const payload = { ...data };
+      if (!payload.password) delete payload.password;
+      await updateUser.mutateAsync({ id: editingUser._id, ...payload });
+      toast.success('User updated successfully');
+      setEditingUser(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to update user');
+    }
+  };
+
+  const openEdit = (user: User) => {
+    setEditingUser(user);
+    resetEdit({ fullName: user.fullName, email: user.email, phone: user.phone });
   };
 
   const filtered = users?.filter(u =>
@@ -178,6 +214,7 @@ const Users = () => {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(user)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Pencil size={14} /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteId(user._id)} className="h-8 w-8 text-dash-muted hover:text-dash-danger cursor-pointer"><Trash2 size={14} /></Button>
                       </div>
                     </TableCell>
@@ -254,12 +291,56 @@ const Users = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle className="font-inter">Edit User</DialogTitle></DialogHeader>
+          <form onSubmit={handleEditSubmit(onEditUser)} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input {...registerEdit('fullName')} className="border-dash-border" />
+              {editErrors.fullName && <p className="text-dash-danger text-xs">{editErrors.fullName.message as string}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" {...registerEdit('email')} className="border-dash-border" />
+              {editErrors.email && <p className="text-dash-danger text-xs">{editErrors.email.message as string}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input {...registerEdit('phone')} className="border-dash-border" />
+              {editErrors.phone && <p className="text-dash-danger text-xs">{editErrors.phone.message as string}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Password (Leave blank to keep current)</Label>
+              <Input type="password" {...registerEdit('password')} className="border-dash-border" placeholder="New password" />
+              {editErrors.password && <p className="text-dash-danger text-xs">{editErrors.password.message as string}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Facture (TND)</Label>
+                <Input type="number" defaultValue={editingUser?.facture} onChange={(e) => { if(editingUser) setEditingUser({...editingUser, facture: Number(e.target.value)}) }} className="border-dash-border" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingUser(null)} className="cursor-pointer">Cancel</Button>
+              <Button type="button" onClick={() => { if(editingUser) onEditUser({ ...editingUser, facture: editingUser.facture }) }} disabled={updateUser.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
+                {updateUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 function UserDetailContent({ user, onToggleStatus, onToggleBlacklist }: { user: User; onToggleStatus: (u: User) => void; onToggleBlacklist: (u: User) => void }) {
   const { data: history, isLoading: historyLoading } = useUserHistory(user._id);
+  const [noteText, setNoteText] = useState('');
+  const addNote = useAddUserNote();
+  const { adminEmail } = useAuth();
 
   return (
     <div className="space-y-6 mt-6">
@@ -325,9 +406,9 @@ function UserDetailContent({ user, onToggleStatus, onToggleBlacklist }: { user: 
         ) : !history?.bookings?.length ? (
           <p className="text-xs text-dash-muted">No bookings for this user.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
             {history.bookings.map((b) => (
-              <div key={b._id} className="p-3 rounded-lg bg-dash-bg text-xs space-y-1">
+              <div key={b._id} className="p-3 rounded-lg bg-dash-bg text-xs space-y-1 border border-dash-border">
                 <div className="flex items-center justify-between">
                   <span className="text-dash-text font-medium">
                     {b.car ? `${b.car.marque} - ${b.car.matricule}` : 'Unknown car'}
@@ -342,6 +423,56 @@ function UserDetailContent({ user, onToggleStatus, onToggleBlacklist }: { user: 
             ))}
           </div>
         )}
+      </div>
+
+      {/* Admin Notes Timeline */}
+      <div className="border-t border-dash-border pt-4 pb-10">
+        <h4 className="text-sm font-semibold text-dash-text mb-3">Admin Notes</h4>
+        <div className="space-y-3 mb-4">
+          {!user.notes || user.notes.length === 0 ? (
+            <p className="text-xs text-dash-muted">No admin notes yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {user.notes.slice().reverse().map(note => (
+                <div key={note._id} className="bg-dash-bg p-3 rounded-lg border border-dash-border relative">
+                  <p className="text-sm text-dash-text whitespace-pre-wrap">{note.text}</p>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-dash-border/50">
+                    <span className="text-[10px] text-dash-muted font-medium">{note.createdBy}</span>
+                    <span className="text-[10px] text-dash-muted">{new Date(note.createdAt).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Add Note Form */}
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Write a note about this user..."
+            className="w-full text-sm min-h-[80px] p-3 rounded-lg border border-dash-border focus:ring-1 focus:ring-dash-purple focus:outline-none resize-none bg-transparent"
+          />
+          <Button 
+            onClick={async () => {
+              if (!noteText.trim()) return;
+              try {
+                await addNote.mutateAsync({ id: user._id, text: noteText, createdBy: adminEmail });
+                setNoteText('');
+                toast.success('Note added');
+              } catch {
+                toast.error('Failed to add note');
+              }
+            }}
+            disabled={!noteText.trim() || addNote.isPending}
+            className="self-end hover:bg-dash-purple/90 cursor-pointer text-xs h-8 px-3"
+            size="sm"
+          >
+            {addNote.isPending ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Send size={12} className="mr-1.5" />}
+            Save Note
+          </Button>
+        </div>
       </div>
     </div>
   );

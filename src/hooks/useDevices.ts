@@ -56,6 +56,17 @@ export function useDeleteDevice() {
   });
 }
 
+export function useUpdateDeviceStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'ACTIVE' | 'BLOCKED' | 'RETIRED' }) => {
+      const { data } = await api.patch(`/devices/${id}/status`, { status });
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['devices'] }),
+  });
+}
+
 export interface DeviceStatus {
   vehicleId: string | null;
   deviceId: string;

@@ -34,10 +34,14 @@ const navItems = [
   { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 
-const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  collapsed: boolean;
+  setCollapsed: (c: boolean) => void;
+}
+
+const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
   const location = useLocation();
-  const { logout, role } = useAuth();
+  const { logout, role, user } = useAuth();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -47,9 +51,10 @@ const Sidebar = () => {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-screen bg-white border-r border-dash-border flex flex-col transition-all duration-300 z-40',
+        'fixed left-0 top-0 h-screen bg-white border-r border-dash-border flex flex-col z-40',
         collapsed ? 'w-[68px]' : 'w-[250px]'
       )}
+      style={{ transition: 'width 0.25s ease' }}
     >
       {/* Logo */}
       <div className={cn('flex items-center h-16 px-4 border-b border-dash-border', collapsed ? 'justify-center' : 'gap-3')}>
@@ -102,13 +107,22 @@ const Sidebar = () => {
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-3">
         {/* Admin profile */}
-        <div className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl bg-dash-bg', collapsed && 'justify-center px-2')}>
-          <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
-            <span className="text-dash-purple text-xs font-bold">A</span>
-          </div>
+        <div className={cn('flex items-center rounded-xl bg-dash-bg overflow-hidden', 
+          collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5')}>
+          {user?.photo ? (
+            <img 
+              src={user.photo.startsWith('/uploads') ? `${import.meta.env.VITE_ADMIN_SERVICE_URL || 'http://localhost:6001'}${user.photo}` : user.photo} 
+              alt="Admin" 
+              className="w-8 h-8 rounded-full object-cover flex-shrink-0" 
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-dash-purple text-xs font-bold">A</span>
+            </div>
+          )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-dash-text truncate">Admin</p>
+              <p className="text-sm font-medium text-dash-text truncate">{user?.fullName || 'Admin'}</p>
               <p className="text-xs text-dash-muted truncate">{role || 'ADMIN'}</p>
             </div>
           )}
@@ -119,11 +133,11 @@ const Sidebar = () => {
           variant="ghost"
           onClick={logout}
           className={cn(
-            'w-full text-dash-muted hover:text-dash-danger hover:bg-dash-danger/5 transition-all duration-200 cursor-pointer',
-            collapsed ? 'px-2' : 'justify-start gap-3 px-3'
+            'w-full text-dash-muted hover:text-dash-danger hover:bg-dash-danger/5 transition-all duration-200 cursor-pointer overflow-hidden flex',
+            collapsed ? 'justify-center p-2 h-10 w-10 mx-auto' : 'justify-start gap-3 px-3 h-10'
           )}
         >
-          <LogOut size={18} />
+          <LogOut size={18} className="flex-shrink-0" />
           {!collapsed && <span className="text-sm">Logout</span>}
         </Button>
       </div>

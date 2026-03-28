@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useReclamations, useReclamation, useAssignReclamation, useResolveReclamation, useUpdateReclamationNote, type Reclamation } from '@/hooks/useReclamations';
+import { useNavigate } from 'react-router-dom';
+import { useReclamations, useReclamation, useAssignReclamation, useResolveReclamation, useUpdateReclamationNote, useDeleteReclamation, type Reclamation } from '@/hooks/useReclamations';
 import { useAdmins } from '@/hooks/useAdmins';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, CheckCircle, XCircle, StickyNote, User as UserIcon, Car as CarIcon } from 'lucide-react';
+import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, CheckCircle, XCircle, StickyNote, User as UserIcon, Car as CarIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -34,11 +36,14 @@ const Reclamations = () => {
   const assignReclamation = useAssignReclamation();
   const resolveReclamation = useResolveReclamation();
   const updateNote = useUpdateReclamationNote();
+  const deleteReclamation = useDeleteReclamation();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assignAdminId, setAssignAdminId] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Fetch full detail when a reclamation is selected
   const { data: selectedDetail, isLoading: detailLoading } = useReclamation(selectedId || '');
@@ -89,6 +94,17 @@ const Reclamations = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await deleteReclamation.mutateAsync(deleteId);
+      toast.success('Reclamation deleted');
+      setDeleteId(null);
+    } catch {
+      toast.error('Failed to delete reclamation');
+    }
+  };
+
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 font-inter">
@@ -131,7 +147,7 @@ const Reclamations = () => {
               <TableBody>
                 {filtered.map((r) => (
                   <TableRow key={r._id} className="hover:bg-dash-bg/60 transition-colors">
-                    <TableCell className="text-sm text-dash-text">
+                    <TableCell className="text-sm text-dash-text cursor-pointer hover:underline hover:text-dash-purple" onClick={() => navigate('/dashboard/users', { state: { openUserId: r.userId } })}>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
                           <span className="text-dash-purple text-[10px] font-bold">{r.user?.fullName?.charAt(0)?.toUpperCase() || '?'}</span>
@@ -139,7 +155,7 @@ const Reclamations = () => {
                         <span className="truncate max-w-[120px]">{r.user?.fullName || 'Unknown'}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-dash-muted">
+                    <TableCell className="text-xs text-dash-muted cursor-pointer hover:underline hover:text-dash-purple" onClick={() => navigate('/dashboard/cars', { state: { openCarId: r.carId } })}>
                       {r.car ? `${r.car.marque} - ${r.car.matricule}` : '—'}
                     </TableCell>
                     <TableCell className="text-sm text-dash-muted max-w-[180px] truncate">{r.message}</TableCell>
@@ -147,7 +163,10 @@ const Reclamations = () => {
                     <TableCell className="text-xs text-dash-muted max-w-[120px] truncate">{r.adminNote || '—'}</TableCell>
                     <TableCell className="text-xs text-dash-muted">{new Date(r.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(r)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(r)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(r._id)} className="h-8 w-8 text-dash-muted hover:text-dash-danger cursor-pointer"><Trash2 size={14} /></Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -187,7 +206,7 @@ const Reclamations = () => {
                 </div>
                 {selectedDetail.user ? (
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div><p className="text-dash-muted text-xs">Full Name</p><p className="text-dash-text font-medium">{selectedDetail.user.fullName}</p></div>
+                    <div><p className="text-dash-muted text-xs">Full Name</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelectedId(null); navigate('/dashboard/users', { state: { openUserId: selectedDetail.userId } }); }}>{selectedDetail.user.fullName}</p></div>
                     <div><p className="text-dash-muted text-xs">Email</p><p className="text-dash-text">{selectedDetail.user.email}</p></div>
                     <div><p className="text-dash-muted text-xs">Phone</p><p className="text-dash-text">{selectedDetail.user.phone || '—'}</p></div>
                     <div><p className="text-dash-muted text-xs">Reclamations</p><p className="text-dash-text font-medium">{selectedDetail.userReclamationCount || 0}</p></div>
@@ -213,10 +232,10 @@ const Reclamations = () => {
                   </div>
                   <div className="flex gap-4">
                     {selectedDetail.car.photo && (
-                      <img src={selectedDetail.car.photo} alt="Car" className="rounded-lg w-24 h-16 object-cover flex-shrink-0" />
+                      <img src={selectedDetail.car.photo} alt="Car" className="rounded-lg w-24 h-16 object-cover flex-shrink-0 cursor-pointer" onClick={() => { setSelectedId(null); navigate('/dashboard/cars', { state: { openCarId: selectedDetail.carId } }); }} />
                     )}
                     <div className="grid grid-cols-2 gap-2 text-sm flex-1">
-                      <div><p className="text-dash-muted text-xs">Marque</p><p className="text-dash-text font-medium">{selectedDetail.car.marque}</p></div>
+                      <div><p className="text-dash-muted text-xs">Marque</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelectedId(null); navigate('/dashboard/cars', { state: { openCarId: selectedDetail.carId } }); }}>{selectedDetail.car.marque}</p></div>
                       <div><p className="text-dash-muted text-xs">Matricule</p><p className="text-dash-text font-medium">{selectedDetail.car.matricule}</p></div>
                     </div>
                   </div>
@@ -292,6 +311,23 @@ const Reclamations = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Reclamation</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this reclamation? This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-dash-danger hover:bg-dash-danger/90 cursor-pointer">
+              {deleteReclamation.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
