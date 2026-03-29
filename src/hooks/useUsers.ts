@@ -41,9 +41,9 @@ export function useUser(id: string) {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...userData }: Partial<User> & { id: string }) => {
-      const { data } = await api.put(`/users/${id}`, userData);
-      return data;
+    mutationFn: async ({ id, data }: { id: string; data: Partial<User> | FormData }) => {
+      const resp = await api.put(`/users/${id}`, data);
+      return resp.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });

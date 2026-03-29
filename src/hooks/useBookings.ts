@@ -107,8 +107,8 @@ export function useCancelBooking() {
 export function useUpdateBooking() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...payload }: Partial<Booking> & { id: string }) => {
-      const { data } = await api.put(`/bookings/${id}`, payload);
+    mutationFn: async ({ id, data: updateData }: { id: string, data: Partial<Booking> | FormData }) => {
+      const { data } = await api.put(`/bookings/${id}`, updateData);
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),

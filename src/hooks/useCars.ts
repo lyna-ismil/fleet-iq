@@ -19,7 +19,7 @@ export interface Car {
   lastKnownLocation?: { lat: number; lng: number };
   lastKnownOdometer?: number;
   availability: {
-    status: 'AVAILABLE' | 'RESERVED' | 'IN_USE';
+    status: 'AVAILABLE' | 'RESERVED' | 'IN_USE' | 'MAINTENANCE';
     bookingId?: string | null;
   };
   createdAt: string;
@@ -95,6 +95,17 @@ export function useUpdateCarHealth() {
   return useMutation({
     mutationFn: async ({ id, ...healthData }: { id: string; healthStatus?: string; lastKnownLocation?: { lat: number; lng: number }; lastKnownOdometer?: number }) => {
       const { data } = await api.patch(`/cars/${id}/health`, healthData);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cars'] }),
+  });
+}
+
+export function useUpdateCarStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { data } = await api.patch(`/cars/${id}/status`, { status });
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cars'] }),

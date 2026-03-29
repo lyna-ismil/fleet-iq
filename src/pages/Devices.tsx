@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDevices, useRegisterDevice, usePairDevice, useDeleteDevice, useUpdateDeviceStatus, useDeviceStatuses, type Device } from '@/hooks/useDevices';
+import { useDevices, useRegisterDevice, usePairDevice, useDeleteDevice, useUpdateDeviceStatus, useUpdateDevice, useDeviceStatuses, type Device } from '@/hooks/useDevices';
 import { useCars } from '@/hooks/useCars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,7 +16,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Cpu, AlertCircle, RefreshCw, Link2, Trash2, Loader2, Link2Off, Eye, Pencil, Activity } from 'lucide-react';
+import { Plus, Search, Cpu, AlertCircle, RefreshCw, Link2, Trash2, Loader2, Link2Off, Eye, Pencil, Activity, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const deviceSchema = z.object({
@@ -41,6 +41,7 @@ const Devices = () => {
   const pairDevice = usePairDevice();
   const deleteDevice = useDeleteDevice();
   const updateDeviceStatus = useUpdateDeviceStatus();
+  const updateDevice = useUpdateDevice();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
@@ -51,6 +52,8 @@ const Devices = () => {
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [editStatus, setEditStatus] = useState<Device['status']>('ACTIVE');
+  const [editFirmware, setEditFirmware] = useState('');
+  const [editCarId, setEditCarId] = useState('');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<DeviceFormData>({
     resolver: zodResolver(deviceSchema),
@@ -94,11 +97,16 @@ const Devices = () => {
     e.preventDefault();
     if (!editingDevice) return;
     try {
-      await updateDeviceStatus.mutateAsync({ id: editingDevice._id, status: editStatus });
-      toast.success('Device status updated');
+      await updateDevice.mutateAsync({
+        id: editingDevice._id,
+        status: editStatus,
+        firmwareVersion: editFirmware,
+        carId: editCarId || null // Send null to unpair if empty
+      });
+      toast.success('Device updated successfully');
       setEditingDevice(null);
     } catch {
-      toast.error('Failed to update status');
+      toast.error('Failed to update device');
     }
   };
 
@@ -190,7 +198,7 @@ const Devices = () => {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => setDetailDevice(d)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingDevice(d); setEditStatus(d.status); }} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Pencil size={14} /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingDevice(d); setEditStatus(d.status); setEditFirmware(d.firmwareVersion || ''); setEditCarId(d.carId || ''); }} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Pencil size={14} /></Button>
                           {d.carId ? (
                             <Button variant="ghost" size="icon" onClick={() => handleUnpair(d._id)} className="h-8 w-8 text-dash-muted hover:text-dash-warning cursor-pointer" title="Unpair"><Link2Off size={14} /></Button>
                           ) : (
@@ -355,32 +363,77 @@ const Devices = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Edit Status Modal */}
-      <Dialog open={!!editingDevice} onOpenChange={() => setEditingDevice(null)}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader><DialogTitle className="font-inter">Edit Device Status</DialogTitle></DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as any)}
-                className="w-full text-sm h-10 px-3 rounded-lg border border-dash-border bg-transparent focus:ring-1 focus:ring-dash-purple focus:outline-none cursor-pointer"
-              >
-                {Object.keys(statusColors).map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingDevice(null)} className="cursor-pointer">Cancel</Button>
-              <Button type="submit" disabled={updateDeviceStatus.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                {updateDeviceStatus.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Form Drawer */}
+      <Sheet open={!!editingDevice} onOpenChange={(open) => !open && setEditingDevice(null)}>
+        <SheetContent className="w-full sm:max-w-[480px] p-0 flex flex-col font-inter bg-dash-bg overflow-y-auto">
+          <SheetHeader className="p-6 pb-4 border-b border-dash-border bg-white sticky top-0 z-10">
+            <SheetTitle className="text-xl font-bold text-dash-text tracking-tight">Edit Device</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 p-6">
+            <form id="edit-device-form" onSubmit={handleEditSubmit} className="space-y-6">
+              
+              {/* READ-ONLY ID */}
+              <div className="space-y-2">
+                <Label>Device MAC ID (Read-Only)</Label>
+                <div className="relative">
+                  <Input readOnly value={editingDevice?.deviceId || ''} className="font-mono text-sm bg-gray-50 border-dash-border text-dash-muted" />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Lock size={14} className="text-dash-muted/50" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-dash-muted">The unique hardware identifier cannot be modified after registration.</p>
+              </div>
+
+              {/* STATUS TOGGLE */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setEditStatus('ACTIVE')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editStatus === 'ACTIVE' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Active</button>
+                  <button type="button" onClick={() => setEditStatus('BLOCKED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editStatus === 'BLOCKED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Blocked</button>
+                  <button type="button" onClick={() => setEditStatus('RETIRED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editStatus === 'RETIRED' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Retired</button>
+                </div>
+              </div>
+
+              {/* FIRMWARE */}
+              <div className="space-y-2">
+                <Label>Firmware Version</Label>
+                <Input value={editFirmware} onChange={(e) => setEditFirmware(e.target.value)} className="border-dash-border" placeholder="e.g. 1.0.0" />
+              </div>
+
+              {/* VEHICLE PAIRING */}
+              <div className="space-y-3 pt-4 border-t border-dash-border">
+                <Label>Assigned Vehicle</Label>
+                <Select value={editCarId || 'unassigned'} onValueChange={(val) => setEditCarId(val === 'unassigned' ? '' : val)}>
+                  <SelectTrigger className="border-dash-border focus:ring-dash-purple/20">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned" className="text-dash-danger font-medium">Unassigned (Unpair)</SelectItem>
+                    {cars?.map((c) => (
+                      <SelectItem key={c._id} value={c._id}>{c.matricule} — {c.marque}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editingDevice?.carId && editingDevice.carId !== editCarId && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                    <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 leading-tight">
+                      <strong>Reassignment Warning:</strong> Changing or removing the assigned vehicle will immediately unlink this device's telemetry stream from the current car.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+            </form>
+          </div>
+          <div className="p-6 border-t border-dash-border bg-white sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+            <Button type="button" variant="outline" onClick={() => setEditingDevice(null)} className="flex-1 cursor-pointer">Cancel</Button>
+            <Button type="submit" form="edit-device-form" disabled={updateDevice.isPending} className="flex-1 bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer shadow-sm">
+              {updateDevice.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

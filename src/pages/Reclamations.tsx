@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReclamations, useReclamation, useAssignReclamation, useResolveReclamation, useUpdateReclamationNote, useDeleteReclamation, type Reclamation } from '@/hooks/useReclamations';
+import { useReclamations, useReclamation, useUpdateReclamation, useDeleteReclamation, type Reclamation } from '@/hooks/useReclamations';
 import { useAdmins } from '@/hooks/useAdmins';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, CheckCircle, XCircle, StickyNote, User as UserIcon, Car as CarIcon, Trash2 } from 'lucide-react';
+import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, StickyNote, User as UserIcon, Car as CarIcon, Trash2, Calendar, Upload, ImageIcon, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -19,6 +20,7 @@ const statusColors: Record<string, string> = {
   IN_PROGRESS: 'bg-dash-warning/15 text-amber-700 border-dash-warning/30',
   RESOLVED: 'bg-dash-success/15 text-emerald-700 border-dash-success/30',
   REJECTED: 'bg-gray-100 text-gray-500 border-gray-200',
+  CLOSED: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
 const bookingStatusColors: Record<string, string> = {
@@ -32,21 +34,32 @@ const bookingStatusColors: Record<string, string> = {
 
 const Reclamations = () => {
   const { data: reclamations, isLoading, isError, refetch } = useReclamations();
-  const { data: admins } = useAdmins();
-  const assignReclamation = useAssignReclamation();
-  const resolveReclamation = useResolveReclamation();
-  const updateNote = useUpdateReclamationNote();
+  const updateReclamation = useUpdateReclamation();
   const deleteReclamation = useDeleteReclamation();
+  const { data: admins } = useAdmins();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [assignAdminId, setAssignAdminId] = useState('');
-  const [noteText, setNoteText] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const [editData, setEditData] = useState<Partial<Reclamation>>({});
+  const [editFile, setEditFile] = useState<File | null>(null);
 
   // Fetch full detail when a reclamation is selected
   const { data: selectedDetail, isLoading: detailLoading } = useReclamation(selectedId || '');
+
+  useEffect(() => {
+    if (selectedDetail) {
+      setEditData({
+        status: selectedDetail.status,
+        assignedAdminId: selectedDetail.assignedAdminId || '',
+        adminNote: selectedDetail.adminNote || '',
+        priority: selectedDetail.priority || 'LOW'
+      });
+      setEditFile(null);
+    }
+  }, [selectedDetail]);
 
   const filtered = reclamations?.filter(r =>
     r.message.toLowerCase().includes(search.toLowerCase()) ||
@@ -59,38 +72,24 @@ const Reclamations = () => {
 
   const handleOpenDetail = (r: Reclamation) => {
     setSelectedId(r._id);
-    setAssignAdminId(r.assignedAdminId || '');
-    setNoteText(r.adminNote || '');
   };
 
-  const handleAssign = async () => {
-    if (!selectedId || !assignAdminId) return;
-    try {
-      await assignReclamation.mutateAsync({ id: selectedId, assignedAdminId: assignAdminId });
-      toast.success('Reclamation assigned');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Assign failed');
-    }
-  };
-
-  const handleResolve = async (status: 'RESOLVED' | 'REJECTED') => {
+  const handleSaveChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedId) return;
     try {
-      await resolveReclamation.mutateAsync({ id: selectedId, status });
-      toast.success(`Reclamation ${status.toLowerCase()}`);
+      const formData = new FormData();
+      if (editData.status) formData.append('status', editData.status!);
+      if (editData.assignedAdminId) formData.append('assignedAdminId', editData.assignedAdminId!);
+      if (editData.adminNote !== undefined) formData.append('adminNote', editData.adminNote!);
+      if (editData.priority) formData.append('priority', editData.priority!);
+      if (editFile) formData.append('image', editFile);
+
+      await updateReclamation.mutateAsync({ id: selectedId, data: formData });
+      toast.success('Reclamation updated successfully');
       setSelectedId(null);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Action failed');
-    }
-  };
-
-  const handleSaveNote = async () => {
-    if (!selectedId) return;
-    try {
-      await updateNote.mutateAsync({ id: selectedId, adminNote: noteText });
-      toast.success('Note saved');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Save failed');
+    } catch {
+      toast.error('Failed to update reclamation');
     }
   };
 
@@ -177,140 +176,177 @@ const Reclamations = () => {
       </Card>
       <p className="text-xs text-dash-muted">Showing {filtered.length} of {reclamations?.length || 0} reclamations</p>
 
-      {/* Detail Modal */}
-      <Dialog open={!!selectedId} onOpenChange={() => setSelectedId(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-inter">Reclamation Details</DialogTitle></DialogHeader>
+      {/* Detail Drawer */}
+      <Sheet open={!!selectedId} onOpenChange={() => setSelectedId(null)}>
+        <SheetContent className="w-[480px] sm:max-w-[480px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-inter">Reclamation Details</SheetTitle>
+          </SheetHeader>
+          
           {detailLoading ? (
-            <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            <div className="space-y-3 p-4 mt-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
           ) : selectedDetail && (
-            <div className="space-y-5">
-              {/* Status + ID */}
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className={`text-xs font-semibold border ${statusColors[selectedDetail.status]}`}>{selectedDetail.status}</Badge>
-                <span className="font-mono text-xs text-dash-muted">#{selectedDetail._id.slice(-8)}</span>
+            <div className="space-y-6 mt-6">
+              
+              {/* HEADER SECTION */}
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-dash-purple flex items-center justify-center flex-shrink-0 text-white text-xl font-bold shadow-md">
+                  {(selectedDetail.user?.fullName || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex flex-col pt-1">
+                  <p className="text-xl font-bold text-dash-text tracking-tight">{selectedDetail.user?.fullName || 'Unknown User'}</p>
+                  <p className="text-sm text-dash-muted mb-2">{selectedDetail.user?.email || 'No email'}</p>
+                  <div>
+                    <Badge variant="outline" className={`text-xs font-semibold border px-2 py-0.5 ${statusColors[selectedDetail.status]}`}>
+                      {selectedDetail.status}
+                    </Badge>
+                  </div>
+                </div>
               </div>
 
-              {/* Message */}
-              <div className="bg-dash-bg rounded-xl p-4">
-                <p className="text-sm text-dash-text leading-relaxed">{selectedDetail.message}</p>
+              {/* STATS ROW */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                  <p className="text-xs text-dash-muted uppercase font-medium mb-1">Reclamations</p>
+                  <p className="text-sm font-bold text-dash-text">{selectedDetail.userReclamationCount || 0}</p>
+                </div>
+                <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                  <p className="text-xs text-dash-muted uppercase font-medium mb-1">Rentals</p>
+                  <p className="text-sm font-bold text-dash-text text-dash-purple">{selectedDetail.user?.nbr_fois_allocation || 0}</p>
+                </div>
+                <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                  <p className="text-xs text-dash-muted uppercase font-medium mb-1 flex items-center gap-1"><Calendar size={12}/> Opened</p>
+                  <p className="text-sm font-bold text-dash-text">{new Date(selectedDetail.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                </div>
               </div>
-              {selectedDetail.image && (
-                <img src={selectedDetail.image} alt="Reclamation attachment" className="rounded-xl max-h-48 object-cover w-full" />
+
+              {/* CAR INFO CARD */}
+              {selectedDetail.car && (
+                <div className="border border-dash-border rounded-xl bg-white overflow-hidden p-4">
+                  <p className="text-xs text-dash-muted uppercase font-medium mb-2">Associated Car</p>
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="text-sm font-bold text-dash-text cursor-pointer hover:underline hover:text-dash-purple transition-colors"
+                      onClick={() => { setSelectedId(null); navigate('/dashboard/cars', { state: { openCarId: selectedDetail.carId } }); }}
+                    >
+                      {selectedDetail.car.marque} — {selectedDetail.car.matricule}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      {selectedDetail.car.availability?.status || 'UNKNOWN'}
+                    </Badge>
+                  </div>
+                </div>
               )}
 
-              {/* User Profile Panel */}
-              <div className="border border-dash-border rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
-                  <UserIcon size={14} className="text-dash-purple" /> User Info
+              {/* RECLAMATION MESSAGE SECTION */}
+              <div className="space-y-2">
+                <p className="text-xs text-dash-muted uppercase font-medium">Message</p>
+                <div className="bg-dash-bg p-4 rounded-xl border border-dash-border">
+                  <p className="text-sm text-dash-text whitespace-pre-wrap leading-relaxed">{selectedDetail.message}</p>
                 </div>
-                {selectedDetail.user ? (
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div><p className="text-dash-muted text-xs">Full Name</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelectedId(null); navigate('/dashboard/users', { state: { openUserId: selectedDetail.userId } }); }}>{selectedDetail.user.fullName}</p></div>
-                    <div><p className="text-dash-muted text-xs">Email</p><p className="text-dash-text">{selectedDetail.user.email}</p></div>
-                    <div><p className="text-dash-muted text-xs">Phone</p><p className="text-dash-text">{selectedDetail.user.phone || '—'}</p></div>
-                    <div><p className="text-dash-muted text-xs">Reclamations</p><p className="text-dash-text font-medium">{selectedDetail.userReclamationCount || 0}</p></div>
-                    <div><p className="text-dash-muted text-xs">Rentals</p><p className="text-dash-text font-medium">{selectedDetail.user.nbr_fois_allocation || 0}</p></div>
-                    <div><p className="text-dash-muted text-xs">Status</p><p className="text-dash-text">{selectedDetail.user.status || '—'}</p></div>
-                    {selectedDetail.user.cinImageUrl && (
-                      <div className="col-span-2">
-                        <p className="text-dash-muted text-xs mb-1">CIN Image</p>
-                        <img src={selectedDetail.user.cinImageUrl} alt="CIN" className="rounded-lg max-h-32 object-cover" />
-                      </div>
-                    )}
+                {selectedDetail.image && (
+                  <div className="mt-3">
+                    <img src={selectedDetail.image.startsWith('http') ? selectedDetail.image : `http://localhost:6005${selectedDetail.image}`} alt="Reclamation Attachment" className="w-full rounded-xl border border-dash-border max-h-64 object-cover" />
                   </div>
-                ) : (
-                  <p className="text-xs text-dash-muted">User data unavailable</p>
                 )}
               </div>
 
-              {/* Car Info Panel */}
-              {selectedDetail.car && (
-                <div className="border border-dash-border rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
-                    <CarIcon size={14} className="text-dash-purple" /> Car Info
-                  </div>
-                  <div className="flex gap-4">
-                    {selectedDetail.car.photo && (
-                      <img src={selectedDetail.car.photo} alt="Car" className="rounded-lg w-24 h-16 object-cover flex-shrink-0 cursor-pointer" onClick={() => { setSelectedId(null); navigate('/dashboard/cars', { state: { openCarId: selectedDetail.carId } }); }} />
-                    )}
-                    <div className="grid grid-cols-2 gap-2 text-sm flex-1">
-                      <div><p className="text-dash-muted text-xs">Marque</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelectedId(null); navigate('/dashboard/cars', { state: { openCarId: selectedDetail.carId } }); }}>{selectedDetail.car.marque}</p></div>
-                      <div><p className="text-dash-muted text-xs">Matricule</p><p className="text-dash-text font-medium">{selectedDetail.car.matricule}</p></div>
-                    </div>
+              <form id="edit-reclamation-form" onSubmit={handleSaveChanges} className="space-y-6 pt-4 border-t border-dash-border">
+                
+                {/* ASSIGN ADMIN */}
+                <div className="space-y-2">
+                  <p className="text-xs text-dash-muted uppercase font-medium">Assign Admin</p>
+                  <Select value={editData.assignedAdminId || 'unassigned'} onValueChange={(val) => setEditData({...editData, assignedAdminId: val === 'unassigned' ? '' : val})}>
+                    <SelectTrigger className="w-full border-dash-border focus:ring-dash-purple/20">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {admins?.map((admin: any) => (
+                        <SelectItem key={admin._id} value={admin._id}>{admin.fullName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* STATUS MAP */}
+                <div className="space-y-2">
+                  <p className="text-xs text-dash-muted uppercase font-medium">Reclamation Status</p>
+                  <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                    <button type="button" onClick={() => setEditData({...editData, status: 'OPEN' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'OPEN' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Open</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'IN_PROGRESS' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'IN_PROGRESS' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>In Progress</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'RESOLVED' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'RESOLVED' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Resolved</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'CLOSED' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'CLOSED' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Closed</button>
                   </div>
                 </div>
-              )}
 
-              {/* Admin Note Editor */}
-              <div className="border border-dash-border rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-dash-text">
-                  <StickyNote size={14} className="text-dash-purple" /> Admin Note
+                {/* PRIORITY MAP */}
+                <div className="space-y-2">
+                  <p className="text-xs text-dash-muted uppercase font-medium">Priority</p>
+                  <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                    <button type="button" onClick={() => setEditData({...editData, priority: 'LOW'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.priority === 'LOW' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Low</button>
+                    <button type="button" onClick={() => setEditData({...editData, priority: 'MEDIUM'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.priority === 'MEDIUM' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Medium</button>
+                    <button type="button" onClick={() => setEditData({...editData, priority: 'HIGH'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.priority === 'HIGH' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>High</button>
+                  </div>
                 </div>
-                <textarea
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Add a note about this reclamation..."
-                  className="w-full min-h-[80px] p-3 rounded-lg border border-dash-border bg-dash-bg text-sm text-dash-text resize-none focus:outline-none focus:ring-1 focus:ring-dash-purple"
-                />
-                <Button onClick={handleSaveNote} disabled={updateNote.isPending} size="sm" className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                  {updateNote.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                  Save Note
-                </Button>
-              </div>
 
-              {/* User Booking History */}
-              {selectedDetail.userBookings && selectedDetail.userBookings.length > 0 && (
-                <div className="border border-dash-border rounded-xl p-4 space-y-3">
-                  <h4 className="text-sm font-semibold text-dash-text">User Booking History</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {selectedDetail.userBookings.map((b) => (
-                      <div key={b._id} className="flex items-center justify-between p-2.5 rounded-lg bg-dash-bg text-xs">
-                        <div className="space-y-0.5">
-                          <p className="text-dash-text font-medium">{b.car ? `${b.car.marque} - ${b.car.matricule}` : 'Unknown car'}</p>
-                          <p className="text-dash-muted">{new Date(b.startDate).toLocaleDateString()} → {new Date(b.endDate).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-dash-text font-medium">{b.payment?.amount ? `${b.payment.amount} ${b.payment.currency || 'TND'}` : '—'}</span>
-                          <Badge variant="outline" className={`text-[10px] font-semibold ${bookingStatusColors[b.status]}`}>{b.status}</Badge>
-                        </div>
+                {/* ADMIN NOTE */}
+                <div className="space-y-2">
+                  <p className="text-xs text-dash-muted uppercase font-medium">Admin Note</p>
+                  <textarea
+                    value={editData.adminNote || ''}
+                    onChange={(e) => setEditData({...editData, adminNote: e.target.value})}
+                    placeholder="Document your findings or resolution here..."
+                    className="w-full min-h-[100px] p-3 rounded-xl border border-dash-border bg-dash-bg text-sm text-dash-text resize-none focus:outline-none focus:ring-1 focus:ring-dash-purple"
+                  />
+                </div>
+
+                {/* RESOLUTION EVIDENCE (Upload) */}
+                <div className="space-y-2">
+                  <p className="text-xs text-dash-muted uppercase font-medium">Resolution Evidence Image (Optional)</p>
+                  {editFile ? (
+                    <div className="flex items-center justify-between p-3 border border-dash-border rounded-lg bg-white">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <ImageIcon size={16} className="text-dash-purple shrink-0" />
+                        <span className="text-sm truncate max-w-[200px]">{editFile.name}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              {(selectedDetail.status === 'OPEN' || selectedDetail.status === 'IN_PROGRESS') && (
-                <div className="border-t border-dash-border pt-4 space-y-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-dash-text">Assign to Admin</label>
-                    <div className="flex gap-2">
-                      <Select value={assignAdminId} onValueChange={setAssignAdminId}>
-                        <SelectTrigger className="flex-1 border-dash-border"><SelectValue placeholder="Select admin" /></SelectTrigger>
-                        <SelectContent>
-                          {admins?.map(a => (<SelectItem key={a._id} value={a._id}>{a.name} ({a.role})</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                      <Button onClick={handleAssign} disabled={!assignAdminId || assignReclamation.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                        {assignReclamation.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Assign'}
-                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditFile(null)} className="h-6 w-6 p-0 text-dash-danger hover:bg-red-50"><X size={14} /></Button>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => handleResolve('RESOLVED')} disabled={resolveReclamation.isPending} className="flex-1 bg-dash-success hover:bg-dash-success/90 text-white cursor-pointer">
-                      <CheckCircle size={14} className="mr-1" />Resolve
-                    </Button>
-                    <Button onClick={() => handleResolve('REJECTED')} disabled={resolveReclamation.isPending} variant="outline" className="flex-1 text-dash-danger border-dash-danger/30 hover:bg-dash-danger/5 cursor-pointer">
-                      <XCircle size={14} className="mr-1" />Reject
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center justify-center gap-2 border border-dash-border rounded-lg px-4 py-2 hover:bg-dash-bg cursor-pointer transition-colors w-full text-sm font-medium text-dash-text bg-white">
+                        <Upload size={14} /> Upload Evidence Image
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && setEditFile(e.target.files[0])} />
+                      </label>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <div className="flex flex-col gap-3 pt-4">
+                  <Button 
+                    type="submit" 
+                    disabled={updateReclamation.isPending} 
+                    className="w-full bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer shadow-sm"
+                  >
+                    {updateReclamation.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+                    Save Changes
+                  </Button>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full justify-center border-dash-danger/30 text-dash-danger hover:bg-dash-danger/5 hover:text-dash-danger font-medium cursor-pointer"
+                    onClick={() => { setDeleteId(selectedDetail._id); setSelectedId(null); }}
+                  >
+                    <Trash2 size={14} className="mr-2" /> Delete Reclamation
+                  </Button>
+                </div>
+              </form>
+
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

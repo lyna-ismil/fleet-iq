@@ -177,7 +177,25 @@
     );
     animation: shimmer-slide 3s ease-in-out infinite;
   }
+
+  /* Drawer components */
+  .drawer-content {
+    @apply flex flex-col h-full max-h-[100dvh] overflow-hidden;
+  }
+
+  .drawer-header {
+    @apply flex-shrink-0 pb-4 border-b;
+  }
+
+  .drawer-body {
+    @apply flex-1 overflow-y-auto overflow-x-hidden py-6 pr-2 -mr-2;
+  }
+
+  .drawer-footer {
+    @apply flex-shrink-0 pt-4 border-t bg-background z-10 sticky bottom-0;
+  }
 }
+
 
 @keyframes shimmer-slide {
   0% { transform: translateX(-100%); }

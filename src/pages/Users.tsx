@@ -17,7 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, Users as UsersIcon, AlertCircle, Loader2, RefreshCw, Eye, Trash2, Plus, Lock, Pencil, Send } from 'lucide-react';
+import { Search, Users as UsersIcon, AlertCircle, Loader2, RefreshCw, Eye, Trash2, Plus, Lock, Pencil, Send, Upload, ImageIcon, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -56,6 +56,9 @@ const Users = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editRole, setEditRole] = useState<'USER' | 'ADMIN'>('USER');
+  const [confirmToggle, setConfirmToggle] = useState<{ type: 'STATUS' | 'BLACKLIST', user: User } | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -89,9 +92,16 @@ const Users = () => {
   const onEditUser = async (data: any) => {
     if (!editingUser) return;
     try {
-      const payload = { ...data };
-      if (!payload.password) delete payload.password;
-      await updateUser.mutateAsync({ id: editingUser._id, ...payload });
+      const formData = new FormData();
+      formData.append('fullName', data.fullName);
+      formData.append('email', data.email);
+      formData.append('phone', data.phone);
+      if (data.password) formData.append('password', data.password);
+      if (editingUser.facture !== undefined) formData.append('facture', String(editingUser.facture));
+      formData.append('role', editRole);
+      if (editFile) formData.append('photo', editFile);
+
+      await updateUser.mutateAsync({ id: editingUser._id, data: formData });
       toast.success('User updated successfully');
       setEditingUser(null);
     } catch (err: any) {
@@ -102,6 +112,8 @@ const Users = () => {
   const openEdit = (user: User) => {
     setEditingUser(user);
     resetEdit({ fullName: user.fullName, email: user.email, phone: user.phone });
+    setEditRole((user as any).role || 'USER');
+    setEditFile(null);
   };
 
   const filtered = users?.filter(u =>
@@ -110,25 +122,25 @@ const Users = () => {
     u.phone.includes(search)
   ) || [];
 
-  const handleToggleStatus = async (user: User) => {
-    try {
-      await updateUser.mutateAsync({ id: user._id, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' });
-      toast.success(`User ${user.status === 'ACTIVE' ? 'suspended' : 'activated'} successfully`);
-      if (selectedUser?._id === user._id) {
-        setSelectedUser({ ...user, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' });
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Update failed');
-    }
-  };
+  const requestToggleStatus = (user: User) => setConfirmToggle({ type: 'STATUS', user });
+  const requestToggleBlacklist = (user: User) => setConfirmToggle({ type: 'BLACKLIST', user });
 
-  const handleToggleBlacklist = async (user: User) => {
+  const executeToggle = async () => {
+    if (!confirmToggle) return;
+    const { type, user } = confirmToggle;
     try {
-      await updateUser.mutateAsync({ id: user._id, blacklist: !user.blacklist });
-      toast.success(`User ${user.blacklist ? 'removed from' : 'added to'} blacklist`);
-      if (selectedUser?._id === user._id) {
-        setSelectedUser({ ...user, blacklist: !user.blacklist });
+      if (type === 'STATUS') {
+        const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+        await updateUser.mutateAsync({ id: user._id, data: { status: newStatus } });
+        toast.success(`User ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'} successfully`);
+        if (selectedUser?._id === user._id) setSelectedUser({ ...user, status: newStatus });
+      } else {
+        const newBlacklist = !user.blacklist;
+        await updateUser.mutateAsync({ id: user._id, data: { blacklist: newBlacklist } });
+        toast.success(`User ${newBlacklist ? 'added to' : 'removed from'} blacklist`);
+        if (selectedUser?._id === user._id) setSelectedUser({ ...user, blacklist: newBlacklist });
       }
+      setConfirmToggle(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Update failed');
     }
@@ -234,7 +246,7 @@ const Users = () => {
           <SheetHeader>
             <SheetTitle className="font-inter">User Details</SheetTitle>
           </SheetHeader>
-          {selectedUser && <UserDetailContent user={selectedUser} onToggleStatus={handleToggleStatus} onToggleBlacklist={handleToggleBlacklist} />}
+          {selectedUser && <UserDetailContent user={selectedUser} onToggleStatus={requestToggleStatus} onToggleBlacklist={requestToggleBlacklist} />}
         </SheetContent>
       </Sheet>
 
@@ -249,6 +261,27 @@ const Users = () => {
             <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-dash-danger hover:bg-dash-danger/90 cursor-pointer">
               {deleteUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Toggle Confirmation Dialog */}
+      <AlertDialog open={!!confirmToggle} onOpenChange={() => setConfirmToggle(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Action</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmToggle?.type === 'STATUS' 
+                ? `Are you sure you want to ${confirmToggle.user.status === 'ACTIVE' ? 'suspend' : 'activate'} this user's account?` 
+                : `Are you sure you want to ${confirmToggle?.user.blacklist ? 'remove from' : 'add to'} the blacklist?`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeToggle} className="bg-dash-purple hover:bg-dash-purple/90 cursor-pointer">
+              {updateUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -292,46 +325,90 @@ const Users = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit User Modal */}
-      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-inter">Edit User</DialogTitle></DialogHeader>
-          <form onSubmit={handleEditSubmit(onEditUser)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input {...registerEdit('fullName')} className="border-dash-border" />
-              {editErrors.fullName && <p className="text-dash-danger text-xs">{editErrors.fullName.message as string}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" {...registerEdit('email')} className="border-dash-border" />
-              {editErrors.email && <p className="text-dash-danger text-xs">{editErrors.email.message as string}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input {...registerEdit('phone')} className="border-dash-border" />
-              {editErrors.phone && <p className="text-dash-danger text-xs">{editErrors.phone.message as string}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Password (Leave blank to keep current)</Label>
-              <Input type="password" {...registerEdit('password')} className="border-dash-border" placeholder="New password" />
-              {editErrors.password && <p className="text-dash-danger text-xs">{editErrors.password.message as string}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Facture (TND)</Label>
-                <Input type="number" defaultValue={editingUser?.facture} onChange={(e) => { if(editingUser) setEditingUser({...editingUser, facture: Number(e.target.value)}) }} className="border-dash-border" />
+      {/* Edit User Drawer */}
+      <Sheet open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <SheetContent className="w-full sm:max-w-[480px] p-0 flex flex-col font-inter bg-dash-bg overflow-y-auto">
+          <SheetHeader className="p-6 pb-4 border-b border-dash-border bg-white sticky top-0 z-10">
+            <SheetTitle className="text-xl font-bold text-dash-text tracking-tight">Edit User</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 p-6">
+            <form id="edit-user-form" onSubmit={handleEditSubmit(onEditUser)} className="space-y-6">
+              
+              <div className="space-y-2 border-b border-dash-border pb-4">
+                <Label>User Role</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setEditRole('USER')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editRole === 'USER' ? 'bg-dash-purple text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Standard User</button>
+                  <button type="button" onClick={() => setEditRole('ADMIN')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editRole === 'ADMIN' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Admin</button>
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingUser(null)} className="cursor-pointer">Cancel</Button>
-              <Button type="button" onClick={() => { if(editingUser) onEditUser({ ...editingUser, facture: editingUser.facture }) }} disabled={updateUser.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                {updateUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input {...registerEdit('fullName')} className="border-dash-border" />
+                  {editErrors.fullName && <p className="text-dash-danger text-xs">{editErrors.fullName.message as string}</p>}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input type="email" {...registerEdit('email')} className="border-dash-border" />
+                  {editErrors.email && <p className="text-dash-danger text-xs">{editErrors.email.message as string}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input {...registerEdit('phone')} className="border-dash-border" />
+                  {editErrors.phone && <p className="text-dash-danger text-xs">{editErrors.phone.message as string}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Password (Leave blank to keep current)</Label>
+                  <Input type="password" {...registerEdit('password')} className="border-dash-border" placeholder="New password" />
+                  {editErrors.password && <p className="text-dash-danger text-xs">{editErrors.password.message as string}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Facture (TND)</Label>
+                    <Input type="number" defaultValue={editingUser?.facture} onChange={(e) => { if(editingUser) setEditingUser({...editingUser, facture: Number(e.target.value)}) }} className="border-dash-border" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Profile Photo</Label>
+                  {editFile ? (
+                    <div className="flex items-center justify-between p-3 border border-dash-border rounded-lg bg-white">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <ImageIcon size={16} className="text-dash-purple shrink-0" />
+                        <span className="text-sm truncate max-w-[200px]">{editFile.name}</span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditFile(null)} className="h-6 w-6 p-0 text-dash-danger hover:bg-red-50 cursor-pointer"><X size={14} /></Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center justify-center gap-2 border border-dash-border rounded-lg px-4 py-2 hover:bg-dash-bg cursor-pointer transition-colors w-full text-sm font-medium text-dash-text bg-white">
+                        <Upload size={14} /> Upload Avatar
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && setEditFile(e.target.files[0])} />
+                      </label>
+                    </div>
+                  )}
+                  {(editingUser as any)?.profilePhoto && !editFile && (
+                    <p className="text-xs text-dash-muted mt-1 text-right">Already has an avatar.</p>
+                  )}
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div className="p-6 border-t border-dash-border bg-white sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+            <Button type="button" variant="outline" onClick={() => setEditingUser(null)} className="flex-1 cursor-pointer">Cancel</Button>
+            <Button type="submit" form="edit-user-form" disabled={updateUser.isPending} className="flex-1 bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer shadow-sm">
+              {updateUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

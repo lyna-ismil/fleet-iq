@@ -20,6 +20,9 @@ export interface ReclamationCar {
   matricule: string;
   photo?: string;
   location?: string;
+  availability?: {
+    status: string;
+  };
 }
 
 export interface ReclamationBooking {
@@ -42,10 +45,11 @@ export interface Reclamation {
   carId?: string;
   message: string;
   image?: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED' | 'CLOSED';
   assignedAdminId?: string;
   bookingId?: string;
   adminNote?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   createdAt: string;
   updatedAt: string;
   // Enriched fields from GET endpoints
@@ -90,11 +94,11 @@ export function useAssignReclamation() {
   });
 }
 
-export function useResolveReclamation() {
+export function useUpdateReclamationStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'RESOLVED' | 'REJECTED' }) => {
-      const { data } = await api.put(`/reclamations/${id}/resolve`, { status });
+    mutationFn: async ({ id, status }: { id: string; status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED' | 'CLOSED' }) => {
+      const { data } = await api.put(`/reclamations/${id}/status`, { status });
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reclamations'] }),
@@ -107,6 +111,17 @@ export function useUpdateReclamationNote() {
     mutationFn: async ({ id, adminNote }: { id: string; adminNote: string }) => {
       const { data } = await api.put(`/reclamations/${id}/note`, { adminNote });
       return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reclamations'] }),
+  });
+}
+
+export function useUpdateReclamation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Reclamation> | FormData }) => {
+      const resp = await api.put(`/reclamations/${id}`, data);
+      return resp.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reclamations'] }),
   });

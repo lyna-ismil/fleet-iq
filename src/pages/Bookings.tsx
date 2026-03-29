@@ -8,10 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Search, CalendarCheck, AlertCircle, RefreshCw, Eye, Check, X, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Search, CalendarCheck, AlertCircle, RefreshCw, Eye, Check, X, Loader2, Pencil, Trash2, User as UserIcon, Upload, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -43,8 +44,23 @@ const Bookings = () => {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: 'confirm' | 'cancel'; id: string } | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [editStatus, setEditStatus] = useState<Booking['status']>('PENDING');
+  const [editData, setEditData] = useState<Partial<Booking>>({});
+  const [editFile, setEditFile] = useState<File | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string>('UNPAID');
+
+  const openEdit = (b: Booking) => {
+    setEditData({
+      status: b.status,
+      startDate: new Date(b.startDate).toISOString().slice(0, 16), // 'YYYY-MM-DDThh:mm'
+      endDate: new Date(b.endDate).toISOString().slice(0, 16),
+      pickupLocation: b.pickupLocation || '',
+      dropoffLocation: b.dropoffLocation || ''
+    });
+    setPaymentStatus(b.payment?.status || 'UNPAID');
+    setEditFile(null);
+    setEditingBooking(b);
+  };
 
   const filtered = bookings?.filter(b =>
     b._id.toLowerCase().includes(search.toLowerCase()) ||
@@ -86,11 +102,20 @@ const Bookings = () => {
     e.preventDefault();
     if (!editingBooking) return;
     try {
-      await updateBooking.mutateAsync({ id: editingBooking._id, status: editStatus });
-      toast.success('Booking status updated');
+      const formData = new FormData();
+      if (editData.status) formData.append('status', editData.status);
+      if (editData.startDate) formData.append('startDate', new Date(editData.startDate as string).toISOString());
+      if (editData.endDate) formData.append('endDate', new Date(editData.endDate as string).toISOString());
+      if (editData.pickupLocation !== undefined) formData.append('pickupLocation', editData.pickupLocation);
+      if (editData.dropoffLocation !== undefined) formData.append('dropoffLocation', editData.dropoffLocation);
+      if (editFile) formData.append('image', editFile);
+      formData.append('payment', JSON.stringify({ status: paymentStatus }));
+
+      await updateBooking.mutateAsync({ id: editingBooking._id, data: formData });
+      toast.success('Booking updated successfully');
       setEditingBooking(null);
-    } catch {
-      toast.error('Failed to update booking');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to update booking');
     }
   };
 
@@ -158,7 +183,7 @@ const Bookings = () => {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => setSelected(b)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Eye size={14} /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingBooking(b); setEditStatus(b.status); }} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Pencil size={14} /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(b)} className="h-8 w-8 text-dash-muted hover:text-dash-purple cursor-pointer"><Pencil size={14} /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteId(b._id)} className="h-8 w-8 text-dash-muted hover:text-dash-danger cursor-pointer"><Trash2 size={14} /></Button>
                         {b.status === 'PENDING' && (
                           <>
@@ -177,44 +202,114 @@ const Bookings = () => {
       </Card>
       <p className="text-xs text-dash-muted">Showing {filtered.length} of {bookings?.length || 0} bookings</p>
 
-      {/* Detail Modal */}
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-inter">Booking Details</DialogTitle></DialogHeader>
-          {selected && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-dash-muted text-xs">Booking ID</p><p className="font-mono text-dash-text">#{selected._id.slice(-8)}</p></div>
-                <div><p className="text-dash-muted text-xs">Status</p><Badge variant="outline" className={`text-[10px] font-semibold border ${statusColors[selected.status]}`}>{selected.status}</Badge></div>
-                <div><p className="text-dash-muted text-xs">User</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelected(null); navigate('/dashboard/users', { state: { openUserId: selected.userId } }); }}>{selected.user?.fullName || selected.userId.slice(-8)}</p></div>
-                <div><p className="text-dash-muted text-xs">Car</p><p className="text-dash-text font-medium cursor-pointer hover:underline hover:text-dash-purple" onClick={() => { setSelected(null); navigate('/dashboard/cars', { state: { openCarId: selected.carId } }); }}>{selected.car ? `${selected.car.marque} - ${selected.car.matricule}` : selected.carId.slice(-8)}</p></div>
-                <div><p className="text-dash-muted text-xs">Start Date</p><p className="text-dash-text">{new Date(selected.startDate).toLocaleString()}</p></div>
-                <div><p className="text-dash-muted text-xs">End Date</p><p className="text-dash-text">{new Date(selected.endDate).toLocaleString()}</p></div>
-                <div><p className="text-dash-muted text-xs">Pickup</p><p className="text-dash-text">{selected.pickupLocation || '—'}</p></div>
-                <div><p className="text-dash-muted text-xs">Dropoff</p><p className="text-dash-text">{selected.dropoffLocation || '—'}</p></div>
-              </div>
-              <div className="border-t border-dash-border pt-3">
-                <p className="text-dash-muted text-xs mb-1">Payment</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-dash-text font-medium">{selected.payment?.amount || 0} {selected.payment?.currency || 'TND'}</span>
-                  <Badge variant="outline" className={`text-[10px] ${paymentColors[selected.payment?.status || 'UNPAID']}`}>{selected.payment?.status || 'UNPAID'}</Badge>
+      {/* Detail Drawer */}
+      <Sheet open={!!selected} onOpenChange={() => setSelected(null)}>
+        <SheetContent className="w-[450px] sm:max-w-[450px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-inter">Booking Details</SheetTitle>
+          </SheetHeader>
+          {selected && (() => {
+            const start = new Date(selected.startDate);
+            const end = new Date(selected.endDate);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            return (
+              <div className="space-y-6 mt-6">
+                {/* HEADER SECTION */}
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 rounded-full bg-dash-purple flex items-center justify-center flex-shrink-0 text-white text-xl font-bold shadow-md">
+                    {(selected.user?.fullName || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex flex-col pt-1">
+                    <p className="text-xl font-bold text-dash-text tracking-tight">{selected.user?.fullName || 'Unknown User'}</p>
+                    <p className="text-sm text-dash-muted mb-2">{selected.user?.email || 'No email provided'}</p>
+                    <div>
+                      <Badge variant="outline" className={`text-xs font-semibold border px-2 py-0.5 ${statusColors[selected.status]}`}>
+                        {selected.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* STATS ROW */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                    <p className="text-xs text-dash-muted uppercase font-medium mb-1">Amount</p>
+                    <p className="text-sm font-bold text-dash-text">{selected.payment?.amount || 0} {selected.payment?.currency || 'TND'}</p>
+                  </div>
+                  <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                    <p className="text-xs text-dash-muted uppercase font-medium mb-1">Duration</p>
+                    <p className="text-sm font-bold text-dash-text">{durationDays} days</p>
+                  </div>
+                  <div className="p-3 bg-dash-bg rounded-xl border border-dash-border">
+                    <p className="text-xs text-dash-muted uppercase font-medium mb-1">Payment</p>
+                    <Badge variant="outline" className={`text-[10px] mt-0.5 font-bold ${paymentColors[selected.payment?.status || 'UNPAID']}`}>
+                      {selected.payment?.status || 'UNPAID'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* DETAILS SECTION */}
+                <div className="border border-dash-border rounded-xl bg-white overflow-hidden">
+                  <div className="p-4 space-y-4">
+                    <div className="flex justify-between items-center pb-3 border-b border-dash-border">
+                      <span className="text-xs text-dash-muted uppercase tracking-wide font-medium">Car</span>
+                      <span 
+                        className="text-sm font-bold text-dash-text cursor-pointer hover:underline hover:text-dash-purple transition-colors"
+                        onClick={() => { setSelected(null); navigate('/dashboard/cars', { state: { openCarId: selected.carId } }); }}
+                      >
+                        {selected.car ? `${selected.car.marque} — ${selected.car.matricule}` : 'Unknown Car'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-dash-border">
+                      <span className="text-xs text-dash-muted uppercase tracking-wide font-medium">Start Date</span>
+                      <span className="text-sm font-bold text-dash-text">{start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-dash-border">
+                      <span className="text-xs text-dash-muted uppercase tracking-wide font-medium">End Date</span>
+                      <span className="text-sm font-bold text-dash-text">{end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {end.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-dash-border">
+                      <span className="text-xs text-dash-muted uppercase tracking-wide font-medium">Pickup</span>
+                      <span className="text-sm font-bold text-dash-text">{selected.pickupLocation || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-dash-muted uppercase tracking-wide font-medium">Dropoff</span>
+                      <span className="text-sm font-bold text-dash-text">{selected.dropoffLocation || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {selected.contractUrl && (
+                  <div className="pt-2">
+                    <a href={selected.contractUrl} target="_blank" rel="noopener noreferrer" className="text-dash-purple text-sm font-medium hover:underline cursor-pointer flex items-center gap-2">View Contract Document &rarr;</a>
+                  </div>
+                )}
+
+                {/* ACTIONS */}
+                <div className="pt-6 space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-center bg-white border-dash-border hover:bg-dash-bg text-dash-text font-medium cursor-pointer"
+                    onClick={() => { openEdit(selected); setSelected(null); }}
+                  >
+                    <Pencil size={14} className="mr-2" /> Edit Booking
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-center border-dash-danger/30 text-dash-danger hover:bg-dash-danger/5 hover:text-dash-danger font-medium cursor-pointer"
+                    onClick={() => { setDeleteId(selected._id); setSelected(null); }}
+                  >
+                    <Trash2 size={14} className="mr-2" /> Delete Booking
+                  </Button>
                 </div>
               </div>
-              {selected.contractUrl && (
-                <div className="border-t border-dash-border pt-3">
-                  <a href={selected.contractUrl} target="_blank" rel="noopener noreferrer" className="text-dash-purple text-xs hover:underline cursor-pointer">View Contract →</a>
-                </div>
-              )}
-              {selected.status === 'PENDING' && (
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={() => { setSelected(null); setConfirmAction({ type: 'confirm', id: selected._id }); }} className="flex-1 bg-dash-success hover:bg-dash-success/90 text-white cursor-pointer"><Check size={14} className="mr-1" />Confirm</Button>
-                  <Button onClick={() => { setSelected(null); setConfirmAction({ type: 'cancel', id: selected._id }); }} variant="outline" className="flex-1 text-dash-danger border-dash-danger/30 hover:bg-dash-danger/5 cursor-pointer"><X size={14} className="mr-1" />Cancel</Button>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
       {/* Confirm/Cancel Action Dialog */}
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
         <AlertDialogContent>
@@ -250,32 +345,119 @@ const Bookings = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Status Modal */}
-      <Dialog open={!!editingBooking} onOpenChange={() => setEditingBooking(null)}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader><DialogTitle className="font-inter">Edit Booking Status</DialogTitle></DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as any)}
-                className="w-full text-sm h-10 px-3 rounded-lg border border-dash-border bg-transparent focus:ring-1 focus:ring-dash-purple focus:outline-none"
-              >
-                {Object.keys(statusColors).map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingBooking(null)} className="cursor-pointer">Cancel</Button>
-              <Button type="submit" disabled={updateBooking.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                {updateBooking.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Form Drawer */}
+      <Sheet open={!!editingBooking} onOpenChange={(open) => !open && setEditingBooking(null)}>
+        <SheetContent className="w-full sm:max-w-[520px] p-0 flex flex-col font-inter bg-dash-bg">
+          <SheetHeader className="px-6 py-4 border-b border-dash-border">
+            <SheetTitle>Edit Booking</SheetTitle>
+            {editingBooking && <p className="text-xs text-dash-muted mt-1">Booking ID: {editingBooking._id}</p>}
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form id="edit-booking-form" onSubmit={handleEditSubmit} className="space-y-6">
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Status <span className="text-red-500">*</span></Label>
+                  <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                    <button type="button" onClick={() => setEditData({...editData, status: 'PENDING' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'PENDING' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Pending</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'CONFIRMED' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'CONFIRMED' ? 'bg-blue-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Confirmed</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'CANCELLED' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'CANCELLED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Cancelled</button>
+                    <button type="button" onClick={() => setEditData({...editData, status: 'COMPLETED' as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editData.status === 'COMPLETED' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Completed</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Payment Status</Label>
+                  <div className="flex rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50 w-full">
+                     <button type="button" onClick={() => setPaymentStatus('UNPAID')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${paymentStatus === 'UNPAID' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Unpaid</button>
+                     <button type="button" onClick={() => setPaymentStatus('PAID')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${paymentStatus === 'PAID' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Paid</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="datetime-local" 
+                      value={editData.startDate as string} 
+                      onChange={(e) => setEditData({...editData, startDate: e.target.value})} 
+                      className="border-dash-border text-sm" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="datetime-local" 
+                      value={editData.endDate as string} 
+                      onChange={(e) => setEditData({...editData, endDate: e.target.value})} 
+                      className={`border-dash-border text-sm ${editData.startDate && editData.endDate && new Date(editData.endDate) <= new Date(editData.startDate) ? 'border-red-500 focus:ring-red-500/20' : ''}`} 
+                    />
+                  </div>
+                </div>
+                {editData.startDate && editData.endDate && (() => {
+                  const s = new Date(editData.startDate);
+                  const e = new Date(editData.endDate);
+                  if (e <= s) {
+                     return <p className="text-xs text-red-500 font-medium">⚠️ End date must be after start date</p>;
+                  }
+                  const diff = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+                  return <p className="text-xs text-emerald-600 font-medium">Duration: {diff} day{diff !== 1 && 's'}</p>;
+                })()}
+
+                <div className="space-y-2">
+                  <Label>Pickup Location</Label>
+                  <Input 
+                    placeholder="E.g. Tunis Airport" 
+                    value={editData.pickupLocation || ''} 
+                    onChange={(e) => setEditData({...editData, pickupLocation: e.target.value})} 
+                    className="border-dash-border" 
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Dropoff Location</Label>
+                  <Input 
+                    placeholder="E.g. Sousse City Center" 
+                    value={editData.dropoffLocation || ''} 
+                    onChange={(e) => setEditData({...editData, dropoffLocation: e.target.value})} 
+                    className="border-dash-border" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contract Photo (Optional)</Label>
+                  {editFile ? (
+                    <div className="flex items-center justify-between p-3 border border-dash-border rounded-lg bg-white">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <ImageIcon size={16} className="text-dash-purple shrink-0" />
+                        <span className="text-sm truncate max-w-[200px]">{editFile.name}</span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditFile(null)} className="h-6 w-6 p-0 text-dash-danger hover:bg-red-50"><X size={14} /></Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center justify-center gap-2 border border-dash-border rounded-lg px-4 py-2 hover:bg-dash-bg cursor-pointer transition-colors w-full text-sm font-medium text-dash-text bg-white">
+                        <Upload size={14} /> Upload Document
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && setEditFile(e.target.files[0])} />
+                      </label>
+                    </div>
+                  )}
+                  {editingBooking?.contractUrl && !editFile && (
+                    <p className="text-xs text-dash-muted mt-1 text-right">Already has a document uploaded.</p>
+                  )}
+                </div>
+              </div>
+
+            </form>
+          </div>
+          <div className="px-6 py-4 border-t border-dash-border flex justify-end gap-3 bg-white">
+            <Button type="button" variant="outline" onClick={() => setEditingBooking(null)} className="cursor-pointer border-dash-border">Cancel</Button>
+            <Button type="submit" form="edit-booking-form" disabled={updateBooking.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer transition-all shadow-sm">
+              {updateBooking.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
