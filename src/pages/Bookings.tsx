@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBookings, useConfirmBooking, useCancelBooking, useUpdateBooking, useDeleteBooking, type Booking } from '@/hooks/useBookings';
+import { useBookings, useConfirmBooking, useCancelBooking, useUpdateBooking, useDeleteBooking, useCreateBooking, type Booking } from '@/hooks/useBookings';
+import { useUsers } from '@/hooks/useUsers';
+import { useCars } from '@/hooks/useCars';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Search, CalendarCheck, AlertCircle, RefreshCw, Eye, Check, X, Loader2, Pencil, Trash2, User as UserIcon, Upload, ImageIcon } from 'lucide-react';
+import { Search, CalendarCheck, AlertCircle, RefreshCw, Eye, Check, X, Loader2, Pencil, Trash2, User as UserIcon, Upload, ImageIcon, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -35,10 +37,12 @@ const Bookings = () => {
   const { data: bookings, isLoading, isError, refetch } = useBookings();
   const confirmBooking = useConfirmBooking();
   const cancelBooking = useCancelBooking();
-
+  const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
   const deleteBooking = useDeleteBooking();
   const navigate = useNavigate();
+  const { data: users } = useUsers();
+  const { data: cars } = useCars();
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Booking | null>(null);
@@ -48,6 +52,68 @@ const Bookings = () => {
   const [editFile, setEditFile] = useState<File | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('UNPAID');
+
+  // Create Booking state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createUserId, setCreateUserId] = useState('');
+  const [createCarId, setCreateCarId] = useState('');
+  const [createStartDate, setCreateStartDate] = useState('');
+  const [createEndDate, setCreateEndDate] = useState('');
+  const [createPickup, setCreatePickup] = useState('');
+  const [createDropoff, setCreateDropoff] = useState('');
+  const [createAmount, setCreateAmount] = useState('');
+  const [createPayment, setCreatePayment] = useState('UNPAID');
+  const [createStatus, setCreateStatus] = useState('PENDING');
+  const [userSearch, setUserSearch] = useState('');
+  const [carSearch, setCarSearch] = useState('');
+
+  const openCreateForm = () => {
+    setCreateUserId(''); setCreateCarId(''); setCreateStartDate(''); setCreateEndDate('');
+    setCreatePickup(''); setCreateDropoff(''); setCreateAmount(''); setCreatePayment('UNPAID');
+    setCreateStatus('PENDING'); setUserSearch(''); setCarSearch('');
+    setCreateOpen(true);
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createUserId || !createCarId || !createStartDate || !createEndDate) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    if (new Date(createEndDate) <= new Date(createStartDate)) {
+      toast.error('End date must be after start date');
+      return;
+    }
+    try {
+      await createBooking.mutateAsync({
+        userId: createUserId,
+        carId: createCarId,
+        startDate: new Date(createStartDate).toISOString(),
+        endDate: new Date(createEndDate).toISOString(),
+        pickupLocation: createPickup || undefined,
+        dropoffLocation: createDropoff || undefined,
+        payment: {
+          amount: createAmount ? Number(createAmount) : undefined,
+          currency: 'TND',
+          status: createPayment,
+        },
+      });
+      toast.success('Booking created successfully');
+      setCreateOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to create booking');
+    }
+  };
+
+  const filteredUsers = users?.filter(u =>
+    u.fullName.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(userSearch.toLowerCase())
+  ) || [];
+
+  const filteredCars = cars?.filter(c =>
+    c.marque.toLowerCase().includes(carSearch.toLowerCase()) ||
+    c.matricule.toLowerCase().includes(carSearch.toLowerCase())
+  ) || [];
 
   const openEdit = (b: Booking) => {
     setEditData({
@@ -131,9 +197,14 @@ const Bookings = () => {
 
   return (
     <div className="space-y-5 font-inter">
-      <div className="relative w-72">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
-        <Input placeholder="Search bookings..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 border-dash-border" />
+      <div className="flex items-center justify-between">
+        <div className="relative w-72">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
+          <Input placeholder="Search bookings..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 border-dash-border" />
+        </div>
+        <Button onClick={openCreateForm} className="bg-dash-purple hover:bg-dash-purple/90 text-white gap-2 cursor-pointer">
+          <Plus size={16} /> Add Booking
+        </Button>
       </div>
 
       <Card className="border-dash-border">
@@ -454,6 +525,128 @@ const Bookings = () => {
             <Button type="button" variant="outline" onClick={() => setEditingBooking(null)} className="cursor-pointer border-dash-border">Cancel</Button>
             <Button type="submit" form="edit-booking-form" disabled={updateBooking.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer transition-all shadow-sm">
               {updateBooking.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Save Changes
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Create Booking Drawer */}
+      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+        <SheetContent className="w-full sm:max-w-[520px] p-0 flex flex-col font-inter bg-dash-bg">
+          <SheetHeader className="px-6 py-4 border-b border-dash-border">
+            <SheetTitle>Add New Booking</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form id="create-booking-form" onSubmit={handleCreateSubmit} className="space-y-6">
+
+              {/* User Dropdown */}
+              <div className="space-y-2">
+                <Label>User <span className="text-red-500">*</span></Label>
+                <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="border-dash-border text-sm mb-2" />
+                <div className="max-h-[140px] overflow-y-auto border border-dash-border rounded-lg bg-white">
+                  {filteredUsers.length === 0 ? (
+                    <p className="text-xs text-dash-muted p-3 text-center">No users found</p>
+                  ) : filteredUsers.slice(0, 20).map(u => (
+                    <div
+                      key={u._id}
+                      onClick={() => setCreateUserId(u._id)}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-dash-bg transition-colors ${createUserId === u._id ? 'bg-dash-purple/10 border-l-2 border-dash-purple' : ''}`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-dash-purple text-[9px] font-bold">{u.fullName?.charAt(0)?.toUpperCase()}</span>
+                      </div>
+                      <span className="truncate font-medium text-dash-text">{u.fullName}</span>
+                      <span className="text-dash-muted text-xs truncate">— {u.email}</span>
+                    </div>
+                  ))}
+                </div>
+                {createUserId && <p className="text-xs text-emerald-600">✓ {users?.find(u => u._id === createUserId)?.fullName}</p>}
+              </div>
+
+              {/* Car Dropdown */}
+              <div className="space-y-2">
+                <Label>Car <span className="text-red-500">*</span></Label>
+                <Input placeholder="Search cars..." value={carSearch} onChange={(e) => setCarSearch(e.target.value)} className="border-dash-border text-sm mb-2" />
+                <div className="max-h-[140px] overflow-y-auto border border-dash-border rounded-lg bg-white">
+                  {filteredCars.length === 0 ? (
+                    <p className="text-xs text-dash-muted p-3 text-center">No cars found</p>
+                  ) : filteredCars.slice(0, 20).map(c => (
+                    <div
+                      key={c._id}
+                      onClick={() => setCreateCarId(c._id)}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-dash-bg transition-colors ${createCarId === c._id ? 'bg-dash-purple/10 border-l-2 border-dash-purple' : ''}`}
+                    >
+                      <span className="font-medium text-dash-text">{c.marque}</span>
+                      <span className="text-dash-muted text-xs">— {c.matricule}</span>
+                    </div>
+                  ))}
+                </div>
+                {createCarId && <p className="text-xs text-emerald-600">✓ {cars?.find(c => c._id === createCarId)?.marque} — {cars?.find(c => c._id === createCarId)?.matricule}</p>}
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date & Time <span className="text-red-500">*</span></Label>
+                  <Input type="datetime-local" value={createStartDate} onChange={(e) => setCreateStartDate(e.target.value)} className="border-dash-border text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date & Time <span className="text-red-500">*</span></Label>
+                  <Input type="datetime-local" value={createEndDate} onChange={(e) => setCreateEndDate(e.target.value)} className={`border-dash-border text-sm ${createStartDate && createEndDate && new Date(createEndDate) <= new Date(createStartDate) ? 'border-red-500' : ''}`} />
+                </div>
+              </div>
+              {createStartDate && createEndDate && (() => {
+                const s = new Date(createStartDate);
+                const e = new Date(createEndDate);
+                if (e <= s) return <p className="text-xs text-red-500 font-medium">⚠️ End date must be after start date</p>;
+                const diff = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+                return <p className="text-xs text-emerald-600 font-medium">Duration: {diff} day{diff !== 1 && 's'}</p>;
+              })()}
+
+              {/* Locations */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pickup Location <span className="text-red-500">*</span></Label>
+                  <Input placeholder="E.g. Tunis Airport" value={createPickup} onChange={(e) => setCreatePickup(e.target.value)} className="border-dash-border" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dropoff Location <span className="text-red-500">*</span></Label>
+                  <Input placeholder="E.g. Sousse Center" value={createDropoff} onChange={(e) => setCreateDropoff(e.target.value)} className="border-dash-border" />
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div className="space-y-2">
+                <Label>Amount (TND) <span className="text-red-500">*</span></Label>
+                <Input type="number" min="0" step="0.01" placeholder="0.00" value={createAmount} onChange={(e) => setCreateAmount(e.target.value)} className="border-dash-border" />
+              </div>
+
+              {/* Payment Status */}
+              <div className="space-y-2">
+                <Label>Payment Status</Label>
+                <div className="flex rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50 w-full">
+                  <button type="button" onClick={() => setCreatePayment('UNPAID')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createPayment === 'UNPAID' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Unpaid</button>
+                  <button type="button" onClick={() => setCreatePayment('PAID')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createPayment === 'PAID' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Paid</button>
+                </div>
+              </div>
+
+              {/* Booking Status Pills */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreateStatus('PENDING')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'PENDING' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Pending</button>
+                  <button type="button" onClick={() => setCreateStatus('CONFIRMED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'CONFIRMED' ? 'bg-blue-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Confirmed</button>
+                  <button type="button" onClick={() => setCreateStatus('CANCELLED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'CANCELLED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Cancelled</button>
+                  <button type="button" onClick={() => setCreateStatus('COMPLETED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'COMPLETED' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Completed</button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+          <div className="px-6 py-4 border-t border-dash-border flex justify-end gap-3 bg-white">
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="cursor-pointer border-dash-border">Cancel</Button>
+            <Button type="submit" form="create-booking-form" disabled={createBooking.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer transition-all shadow-sm">
+              {createBooking.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Create Booking
             </Button>
           </div>
         </SheetContent>

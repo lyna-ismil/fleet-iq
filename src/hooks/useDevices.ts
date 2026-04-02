@@ -9,6 +9,7 @@ export interface Device {
   status: 'ACTIVE' | 'BLOCKED' | 'RETIRED';
   firmwareVersion?: string;
   lastSeenAt?: string;
+  auth?: { sharedSecretHash?: string };
   createdAt: string;
   updatedAt: string;
 }

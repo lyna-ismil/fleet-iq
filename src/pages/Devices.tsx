@@ -23,6 +23,7 @@ const deviceSchema = z.object({
   serialNumber: z.string().min(1, 'Serial number is required'),
   sharedSecret: z.string().min(16, 'Shared secret must be at least 16 characters'),
   firmwareVersion: z.string().optional(),
+  carId: z.string().optional(),
 });
 
 type DeviceFormData = z.infer<typeof deviceSchema>;
@@ -54,6 +55,7 @@ const Devices = () => {
   const [editStatus, setEditStatus] = useState<Device['status']>('ACTIVE');
   const [editFirmware, setEditFirmware] = useState('');
   const [editCarId, setEditCarId] = useState('');
+  const [createStatus, setCreateStatus] = useState<Device['status']>('ACTIVE');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<DeviceFormData>({
     resolver: zodResolver(deviceSchema),
@@ -61,10 +63,13 @@ const Devices = () => {
 
   const onRegister = async (data: DeviceFormData) => {
     try {
-      await registerDevice.mutateAsync(data as any);
+      const payload: any = { ...data, status: createStatus };
+      if (payload.carId === '' || payload.carId === 'none') delete payload.carId;
+      await registerDevice.mutateAsync(payload);
       toast.success('Device registered successfully');
       setRegisterOpen(false);
       reset();
+      setCreateStatus('ACTIVE');
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Registration failed');
     }
@@ -141,7 +146,7 @@ const Devices = () => {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
           <Input placeholder="Search devices..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 border-dash-border" />
         </div>
-        <Button onClick={() => { setRegisterOpen(true); reset(); }} className="bg-dash-purple hover:bg-dash-purple/90 text-white gap-2 cursor-pointer">
+        <Button onClick={() => { setRegisterOpen(true); reset(); setCreateStatus('ACTIVE'); }} className="bg-dash-purple hover:bg-dash-purple/90 text-white gap-2 cursor-pointer">
           <Plus size={16} /> Register Device
         </Button>
       </div>
@@ -217,34 +222,76 @@ const Devices = () => {
       </Card>
       <p className="text-xs text-dash-muted">Showing {filtered.length} of {devices?.length || 0} devices</p>
 
-      {/* Register Device Modal */}
-      <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-inter">Register Device</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit(onRegister)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Serial Number *</Label>
-              <Input {...register('serialNumber')} className="border-dash-border" placeholder="SN-001-ABC" />
-              {errors.serialNumber && <p className="text-dash-danger text-xs">{errors.serialNumber.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Shared Secret *</Label>
-              <Input type="password" {...register('sharedSecret')} className="border-dash-border" placeholder="Min 16 characters" />
-              {errors.sharedSecret && <p className="text-dash-danger text-xs">{errors.sharedSecret.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Firmware Version</Label>
-              <Input {...register('firmwareVersion')} className="border-dash-border" placeholder="1.0.0" />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setRegisterOpen(false)} className="cursor-pointer">Cancel</Button>
-              <Button type="submit" disabled={registerDevice.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                {registerDevice.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Register
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Register Device Drawer */}
+      <Sheet open={registerOpen} onOpenChange={setRegisterOpen}>
+        <SheetContent className="w-full sm:max-w-[480px] p-0 flex flex-col font-inter bg-dash-bg overflow-y-auto">
+          <SheetHeader className="p-6 pb-4 border-b border-dash-border bg-white sticky top-0 z-10">
+            <SheetTitle className="text-xl font-bold text-dash-text tracking-tight">Register New Device</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 p-6">
+            <form id="register-device-form" onSubmit={handleSubmit(onRegister)} className="space-y-6">
+
+              {/* Serial Number */}
+              <div className="space-y-2">
+                <Label>Serial Number <span className="text-red-500">*</span></Label>
+                <Input {...register('serialNumber')} className="border-dash-border" placeholder="SN-001-ABC" />
+                <p className="text-[10px] text-dash-muted">The unique hardware serial number printed on the OBD-II device.</p>
+                {errors.serialNumber && <p className="text-dash-danger text-xs">{errors.serialNumber.message}</p>}
+              </div>
+
+              {/* Shared Secret */}
+              <div className="space-y-2">
+                <Label>Shared Secret <span className="text-red-500">*</span></Label>
+                <Input type="password" {...register('sharedSecret')} className="border-dash-border" placeholder="Min 16 characters" />
+                <p className="text-[10px] text-dash-muted">The authentication key for this device. Minimum 16 characters, stored securely (hashed).</p>
+                {errors.sharedSecret && <p className="text-dash-danger text-xs">{errors.sharedSecret.message}</p>}
+              </div>
+
+              {/* Initial Status */}
+              <div className="space-y-2">
+                <Label>Initial Status</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreateStatus('ACTIVE')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'ACTIVE' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Active</button>
+                  <button type="button" onClick={() => setCreateStatus('BLOCKED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'BLOCKED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Blocked</button>
+                  <button type="button" onClick={() => setCreateStatus('RETIRED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'RETIRED' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Retired</button>
+                </div>
+                <p className="text-[10px] text-dash-muted">Set the initial operational status. Defaults to Active.</p>
+              </div>
+
+              {/* Firmware Version */}
+              <div className="space-y-2">
+                <Label>Firmware Version</Label>
+                <Input {...register('firmwareVersion')} className="border-dash-border" placeholder="e.g. 1.0.0" />
+                <p className="text-[10px] text-dash-muted">The current firmware version running on the device.</p>
+              </div>
+
+              {/* Initial Car Pairing */}
+              <div className="space-y-2 pt-4 border-t border-dash-border">
+                <Label>Initial Vehicle Pairing <span className="text-dash-muted text-[10px]">(Optional)</span></Label>
+                <Select value={undefined} onValueChange={(val) => register('carId').onChange({ target: { name: 'carId', value: val } })}>
+                  <SelectTrigger className="border-dash-border">
+                    <SelectValue placeholder="No vehicle (pair later)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No vehicle (pair later)</SelectItem>
+                    {cars?.map(c => (
+                      <SelectItem key={c._id} value={c._id}>{c.matricule} — {c.marque}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-dash-muted">Optionally link this device to a vehicle right away. Can be changed later.</p>
+              </div>
+
+            </form>
+          </div>
+          <div className="p-6 border-t border-dash-border bg-white sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+            <Button type="button" variant="outline" onClick={() => setRegisterOpen(false)} className="flex-1 cursor-pointer">Cancel</Button>
+            <Button type="submit" form="register-device-form" disabled={registerDevice.isPending} className="flex-1 bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer shadow-sm">
+              {registerDevice.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Register Device
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Pair Device Modal */}
       <Dialog open={!!pairModal} onOpenChange={() => setPairModal(null)}>
@@ -338,6 +385,10 @@ const Devices = () => {
                   <span className="text-dash-muted">Registered On</span>
                   <span className="text-dash-text">{new Date(detailDevice.createdAt).toLocaleDateString()}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-muted">Last Updated</span>
+                  <span className="text-dash-text">{new Date(detailDevice.updatedAt).toLocaleDateString()}</span>
+                </div>
               </div>
 
               <div className="border border-dash-border rounded-xl p-4 bg-dash-bg space-y-3">
@@ -382,6 +433,26 @@ const Devices = () => {
                   </div>
                 </div>
                 <p className="text-[10px] text-dash-muted">The unique hardware identifier cannot be modified after registration.</p>
+              </div>
+
+              {/* READ-ONLY SERIAL NUMBER */}
+              <div className="space-y-2">
+                <Label>Serial Number (Read-Only)</Label>
+                <div className="relative">
+                  <Input readOnly value={editingDevice?.serialNumber || ''} className="font-mono text-sm bg-gray-50 border-dash-border text-dash-muted" />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Lock size={14} className="text-dash-muted/50" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-dash-muted">The serial number is set at registration and cannot be changed.</p>
+              </div>
+
+              {/* SHARED SECRET NOTE */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
+                <AlertCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-800 leading-tight">
+                  <strong>Authentication:</strong> The shared secret was set at registration and cannot be changed through this form for security reasons.
+                </p>
               </div>
 
               {/* STATUS TOGGLE */}

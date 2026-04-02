@@ -125,3 +125,22 @@ export function useDeleteBooking() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
   });
 }
+
+export function useCreateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (bookingData: {
+      userId: string;
+      carId: string;
+      startDate: string;
+      endDate: string;
+      pickupLocation?: string;
+      dropoffLocation?: string;
+      payment?: { amount?: number; currency?: string; status?: string };
+    }) => {
+      const { data } = await api.post('/bookings', bookingData);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
+  });
+}

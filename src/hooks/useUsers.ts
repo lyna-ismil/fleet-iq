@@ -8,6 +8,7 @@ export interface User {
   phone: string;
   cinImageUrl: string;
   licenseImageUrl: string;
+  profilePhoto?: string | null;
   facture: number;
   nbr_fois_allocation: number;
   blacklist: boolean;

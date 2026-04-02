@@ -60,6 +60,20 @@ const Users = () => {
   const [editRole, setEditRole] = useState<'USER' | 'ADMIN'>('USER');
   const [confirmToggle, setConfirmToggle] = useState<{ type: 'STATUS' | 'BLACKLIST', user: User } | null>(null);
 
+  // Create form extra state
+  const [createRole, setCreateRole] = useState<'USER' | 'ADMIN'>('USER');
+  const [createStatus, setCreateStatus] = useState<'ACTIVE' | 'SUSPENDED'>('ACTIVE');
+  const [createFacture, setCreateFacture] = useState('0');
+  const [createCinUrl, setCreateCinUrl] = useState('');
+  const [createLicenseUrl, setCreateLicenseUrl] = useState('');
+  const [createBlacklist, setCreateBlacklist] = useState(false);
+  const [createNbrAllocation, setCreateNbrAllocation] = useState('0');
+
+  // Edit form extra state
+  const [editStatus, setEditStatus] = useState<'ACTIVE' | 'SUSPENDED'>('ACTIVE');
+  const [editBlacklist, setEditBlacklist] = useState(false);
+  const [editNbrAllocation, setEditNbrAllocation] = useState('0');
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
   });
@@ -80,10 +94,27 @@ const Users = () => {
 
   const onCreateUser = async (data: { fullName: string; email: string; phone: string; password: string }) => {
     try {
-      await createUser.mutateAsync(data);
+      const payload: any = {
+        ...data,
+        role: createRole,
+        status: createStatus,
+        facture: Number(createFacture) || 0,
+        blacklist: createBlacklist,
+        nbr_fois_allocation: Number(createNbrAllocation) || 0,
+      };
+      if (createCinUrl.trim()) payload.cinImageUrl = createCinUrl.trim();
+      if (createLicenseUrl.trim()) payload.licenseImageUrl = createLicenseUrl.trim();
+      await createUser.mutateAsync(payload);
       toast.success('User created successfully');
       setCreateOpen(false);
       reset();
+      setCreateRole('USER');
+      setCreateStatus('ACTIVE');
+      setCreateFacture('0');
+      setCreateCinUrl('');
+      setCreateLicenseUrl('');
+      setCreateBlacklist(false);
+      setCreateNbrAllocation('0');
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Failed to create user');
     }
@@ -99,6 +130,9 @@ const Users = () => {
       if (data.password) formData.append('password', data.password);
       if (editingUser.facture !== undefined) formData.append('facture', String(editingUser.facture));
       formData.append('role', editRole);
+      formData.append('status', editStatus);
+      formData.append('blacklist', String(editBlacklist));
+      formData.append('nbr_fois_allocation', editNbrAllocation);
       if (editFile) formData.append('photo', editFile);
 
       await updateUser.mutateAsync({ id: editingUser._id, data: formData });
@@ -114,6 +148,9 @@ const Users = () => {
     resetEdit({ fullName: user.fullName, email: user.email, phone: user.phone });
     setEditRole((user as any).role || 'USER');
     setEditFile(null);
+    setEditStatus(user.status);
+    setEditBlacklist(user.blacklist);
+    setEditNbrAllocation(String(user.nbr_fois_allocation || 0));
   };
 
   const filtered = users?.filter(u =>
@@ -287,43 +324,111 @@ const Users = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create User Modal */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="font-inter">Add New User</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit(onCreateUser)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Full Name *</Label>
-              <Input {...register('fullName')} className="border-dash-border" placeholder="John Doe" />
-              {errors.fullName && <p className="text-dash-danger text-xs">{errors.fullName.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input type="email" {...register('email')} className="border-dash-border" placeholder="john@example.com" />
-              {errors.email && <p className="text-dash-danger text-xs">{errors.email.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Phone *</Label>
-              <Input {...register('phone')} className="border-dash-border" placeholder="+216 XX XXX XXX" />
-              {errors.phone && <p className="text-dash-danger text-xs">{errors.phone.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Password *</Label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
-                <Input type="password" {...register('password')} className="border-dash-border pl-9" placeholder="Min 6 characters" />
+      {/* Create User Drawer */}
+      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+        <SheetContent className="w-full sm:max-w-[480px] p-0 flex flex-col font-inter bg-dash-bg overflow-y-auto">
+          <SheetHeader className="p-6 pb-4 border-b border-dash-border bg-white sticky top-0 z-10">
+            <SheetTitle className="text-xl font-bold text-dash-text tracking-tight">Add New User</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 p-6">
+            <form id="create-user-form" onSubmit={handleSubmit(onCreateUser)} className="space-y-6">
+
+              {/* Role Toggle */}
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreateRole('USER')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createRole === 'USER' ? 'bg-dash-purple text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Standard User</button>
+                  <button type="button" onClick={() => setCreateRole('ADMIN')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createRole === 'ADMIN' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Admin</button>
+                </div>
               </div>
-              {errors.password && <p className="text-dash-danger text-xs">{errors.password.message}</p>}
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="cursor-pointer">Cancel</Button>
-              <Button type="submit" disabled={createUser.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer">
-                {createUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Create User
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
+              {/* Full Name */}
+              <div className="space-y-2">
+                <Label>Full Name <span className="text-red-500">*</span></Label>
+                <Input {...register('fullName')} className="border-dash-border" placeholder="John Doe" />
+                {errors.fullName && <p className="text-dash-danger text-xs">{errors.fullName.message}</p>}
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <Label>Email <span className="text-red-500">*</span></Label>
+                <Input type="email" {...register('email')} className="border-dash-border" placeholder="john@example.com" />
+                {errors.email && <p className="text-dash-danger text-xs">{errors.email.message}</p>}
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label>Phone <span className="text-red-500">*</span></Label>
+                <Input {...register('phone')} className="border-dash-border" placeholder="+216 XX XXX XXX" />
+                {errors.phone && <p className="text-dash-danger text-xs">{errors.phone.message}</p>}
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <Label>Password <span className="text-red-500">*</span></Label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
+                  <Input type="password" {...register('password')} className="border-dash-border pl-9" placeholder="Min 6 characters" />
+                </div>
+                {errors.password && <p className="text-dash-danger text-xs">{errors.password.message}</p>}
+              </div>
+
+              {/* Status Toggle */}
+              <div className="space-y-2 pt-4 border-t border-dash-border">
+                <Label>Account Status</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreateStatus('ACTIVE')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'ACTIVE' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Active</button>
+                  <button type="button" onClick={() => setCreateStatus('SUSPENDED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createStatus === 'SUSPENDED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Suspended</button>
+                </div>
+              </div>
+
+              {/* Facture */}
+              <div className="space-y-2">
+                <Label>Outstanding Balance (TND)</Label>
+                <Input type="number" min="0" step="0.01" value={createFacture} onChange={(e) => setCreateFacture(e.target.value)} className="border-dash-border" placeholder="0.00" />
+                <p className="text-[10px] text-dash-muted">Initial outstanding balance for billing purposes.</p>
+              </div>
+
+              {/* Allocation Count */}
+              <div className="space-y-2">
+                <Label>Allocation Count</Label>
+                <Input type="number" min="0" step="1" value={createNbrAllocation} onChange={(e) => setCreateNbrAllocation(e.target.value)} className="border-dash-border" placeholder="0" />
+                <p className="text-[10px] text-dash-muted">Number of times this user has been allocated a vehicle.</p>
+              </div>
+
+              {/* Blacklist */}
+              <div className="space-y-2">
+                <Label>Blacklist</Label>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreateBlacklist(false)} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!createBlacklist ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Not Blacklisted</button>
+                  <button type="button" onClick={() => setCreateBlacklist(true)} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createBlacklist ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Blacklisted</button>
+                </div>
+              </div>
+
+              {/* CIN Image URL */}
+              <div className="space-y-2 pt-4 border-t border-dash-border">
+                <Label>CIN Image URL <span className="text-dash-muted text-[10px]">(Optional)</span></Label>
+                <Input value={createCinUrl} onChange={(e) => setCreateCinUrl(e.target.value)} className="border-dash-border" placeholder="https://example.com/cin.jpg" />
+                <p className="text-[10px] text-dash-muted">URL to the user's national ID card image. Can be added later.</p>
+              </div>
+
+              {/* License Image URL */}
+              <div className="space-y-2">
+                <Label>License Image URL <span className="text-dash-muted text-[10px]">(Optional)</span></Label>
+                <Input value={createLicenseUrl} onChange={(e) => setCreateLicenseUrl(e.target.value)} className="border-dash-border" placeholder="https://example.com/license.jpg" />
+                <p className="text-[10px] text-dash-muted">URL to the user's driving license image. Can be added later.</p>
+              </div>
+
+            </form>
+          </div>
+          <div className="p-6 border-t border-dash-border bg-white sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="flex-1 cursor-pointer">Cancel</Button>
+            <Button type="submit" form="create-user-form" disabled={createUser.isPending} className="flex-1 bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer shadow-sm">
+              {createUser.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Create User
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit User Drawer */}
       <Sheet open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
@@ -372,6 +477,28 @@ const Users = () => {
                   <div className="space-y-2">
                     <Label>Facture (TND)</Label>
                     <Input type="number" defaultValue={editingUser?.facture} onChange={(e) => { if(editingUser) setEditingUser({...editingUser, facture: Number(e.target.value)}) }} className="border-dash-border" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Allocation Count</Label>
+                    <Input type="number" min="0" step="1" value={editNbrAllocation} onChange={(e) => setEditNbrAllocation(e.target.value)} className="border-dash-border" />
+                  </div>
+                </div>
+
+                {/* Status Toggle */}
+                <div className="space-y-2 pt-4 border-t border-dash-border">
+                  <Label>Account Status</Label>
+                  <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                    <button type="button" onClick={() => setEditStatus('ACTIVE')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editStatus === 'ACTIVE' ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Active</button>
+                    <button type="button" onClick={() => setEditStatus('SUSPENDED')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editStatus === 'SUSPENDED' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Suspended</button>
+                  </div>
+                </div>
+
+                {/* Blacklist Toggle */}
+                <div className="space-y-2">
+                  <Label>Blacklist</Label>
+                  <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                    <button type="button" onClick={() => setEditBlacklist(false)} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!editBlacklist ? 'bg-emerald-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Not Blacklisted</button>
+                    <button type="button" onClick={() => setEditBlacklist(true)} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${editBlacklist ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Blacklisted</button>
                   </div>
                 </div>
 
@@ -423,8 +550,12 @@ function UserDetailContent({ user, onToggleStatus, onToggleBlacklist }: { user: 
     <div className="space-y-6 mt-6">
       {/* Profile */}
       <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full bg-dash-purple/10 flex items-center justify-center">
-          <span className="text-dash-purple text-xl font-bold">{user.fullName?.charAt(0)?.toUpperCase()}</span>
+        <div className="w-14 h-14 rounded-full bg-dash-purple/10 flex items-center justify-center overflow-hidden">
+          {user.profilePhoto ? (
+            <img src={user.profilePhoto} alt={user.fullName} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-dash-purple text-xl font-bold">{user.fullName?.charAt(0)?.toUpperCase()}</span>
+          )}
         </div>
         <div>
           <p className="text-lg font-semibold text-dash-text">{user.fullName}</p>

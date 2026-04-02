@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReclamations, useReclamation, useUpdateReclamation, useDeleteReclamation, type Reclamation } from '@/hooks/useReclamations';
+import { useReclamations, useReclamation, useUpdateReclamation, useDeleteReclamation, useCreateReclamation, type Reclamation } from '@/hooks/useReclamations';
 import { useAdmins } from '@/hooks/useAdmins';
+import { useUsers } from '@/hooks/useUsers';
+import { useCars } from '@/hooks/useCars';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, StickyNote, User as UserIcon, Car as CarIcon, Trash2, Calendar, Upload, ImageIcon, X } from 'lucide-react';
+import { Search, MessageSquareWarning, AlertCircle, RefreshCw, Eye, Loader2, StickyNote, User as UserIcon, Car as CarIcon, Trash2, Calendar, Upload, ImageIcon, X, Plus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -36,7 +38,10 @@ const Reclamations = () => {
   const { data: reclamations, isLoading, isError, refetch } = useReclamations();
   const updateReclamation = useUpdateReclamation();
   const deleteReclamation = useDeleteReclamation();
+  const createReclamation = useCreateReclamation();
   const { data: admins } = useAdmins();
+  const { data: users } = useUsers();
+  const { data: cars } = useCars();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
@@ -45,6 +50,49 @@ const Reclamations = () => {
 
   const [editData, setEditData] = useState<Partial<Reclamation>>({});
   const [editFile, setEditFile] = useState<File | null>(null);
+
+  // Create Reclamation state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createUserId, setCreateUserId] = useState('');
+  const [createCarId, setCreateCarId] = useState('');
+  const [createMessage, setCreateMessage] = useState('');
+  const [createPriority, setCreatePriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
+  const [createUserSearch, setCreateUserSearch] = useState('');
+  const [createCarSearch, setCreateCarSearch] = useState('');
+
+  const openCreateForm = () => {
+    setCreateUserId(''); setCreateCarId(''); setCreateMessage('');
+    setCreatePriority('MEDIUM'); setCreateUserSearch(''); setCreateCarSearch('');
+    setCreateOpen(true);
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createUserId) { toast.error('Please select a user'); return; }
+    if (createMessage.trim().length < 10) { toast.error('Message must be at least 10 characters'); return; }
+    try {
+      await createReclamation.mutateAsync({
+        userId: createUserId,
+        carId: createCarId || undefined,
+        message: createMessage,
+        priority: createPriority,
+      });
+      toast.success('Reclamation created successfully');
+      setCreateOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to create reclamation');
+    }
+  };
+
+  const createFilteredUsers = users?.filter(u =>
+    u.fullName.toLowerCase().includes(createUserSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(createUserSearch.toLowerCase())
+  ) || [];
+
+  const createFilteredCars = cars?.filter(c =>
+    c.marque.toLowerCase().includes(createCarSearch.toLowerCase()) ||
+    c.matricule.toLowerCase().includes(createCarSearch.toLowerCase())
+  ) || [];
 
   // Fetch full detail when a reclamation is selected
   const { data: selectedDetail, isLoading: detailLoading } = useReclamation(selectedId || '');
@@ -116,9 +164,14 @@ const Reclamations = () => {
 
   return (
     <div className="space-y-5 font-inter">
-      <div className="relative w-72">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
-        <Input placeholder="Search reclamations..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 border-dash-border" />
+      <div className="flex items-center justify-between">
+        <div className="relative w-72">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-muted" />
+          <Input placeholder="Search reclamations..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 border-dash-border" />
+        </div>
+        <Button onClick={openCreateForm} className="bg-dash-purple hover:bg-dash-purple/90 text-white gap-2 cursor-pointer">
+          <Plus size={16} /> Add Reclamation
+        </Button>
       </div>
 
       <Card className="border-dash-border">
@@ -364,6 +417,99 @@ const Reclamations = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Reclamation Drawer */}
+      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+        <SheetContent className="w-full sm:max-w-[520px] p-0 flex flex-col font-inter bg-dash-bg">
+          <SheetHeader className="px-6 py-4 border-b border-dash-border">
+            <SheetTitle>Add New Reclamation</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form id="create-reclamation-form" onSubmit={handleCreateSubmit} className="space-y-6">
+
+              {/* User Dropdown */}
+              <div className="space-y-2">
+                <p className="text-xs text-dash-muted uppercase font-medium">User <span className="text-red-500">*</span></p>
+                <Input placeholder="Search users..." value={createUserSearch} onChange={(e) => setCreateUserSearch(e.target.value)} className="border-dash-border text-sm mb-2" />
+                <div className="max-h-[140px] overflow-y-auto border border-dash-border rounded-lg bg-white">
+                  {createFilteredUsers.length === 0 ? (
+                    <p className="text-xs text-dash-muted p-3 text-center">No users found</p>
+                  ) : createFilteredUsers.slice(0, 20).map(u => (
+                    <div
+                      key={u._id}
+                      onClick={() => setCreateUserId(u._id)}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-dash-bg transition-colors ${createUserId === u._id ? 'bg-dash-purple/10 border-l-2 border-dash-purple' : ''}`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-dash-purple text-[9px] font-bold">{u.fullName?.charAt(0)?.toUpperCase()}</span>
+                      </div>
+                      <span className="truncate font-medium text-dash-text">{u.fullName}</span>
+                      <span className="text-dash-muted text-xs truncate">&mdash; {u.email}</span>
+                    </div>
+                  ))}
+                </div>
+                {createUserId && <p className="text-xs text-emerald-600">&check; {users?.find(u => u._id === createUserId)?.fullName}</p>}
+              </div>
+
+              {/* Car Dropdown (Optional) */}
+              <div className="space-y-2">
+                <p className="text-xs text-dash-muted uppercase font-medium">Car <span className="text-dash-muted text-[10px]">(Optional)</span></p>
+                <Input placeholder="Search cars..." value={createCarSearch} onChange={(e) => setCreateCarSearch(e.target.value)} className="border-dash-border text-sm mb-2" />
+                <div className="max-h-[120px] overflow-y-auto border border-dash-border rounded-lg bg-white">
+                  <div
+                    onClick={() => setCreateCarId('')}
+                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-dash-bg transition-colors ${createCarId === '' ? 'bg-dash-purple/10 border-l-2 border-dash-purple' : ''}`}
+                  >
+                    <span className="text-dash-muted italic">No car (general complaint)</span>
+                  </div>
+                  {createFilteredCars.slice(0, 20).map(c => (
+                    <div
+                      key={c._id}
+                      onClick={() => setCreateCarId(c._id)}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-dash-bg transition-colors ${createCarId === c._id ? 'bg-dash-purple/10 border-l-2 border-dash-purple' : ''}`}
+                    >
+                      <span className="font-medium text-dash-text">{c.marque}</span>
+                      <span className="text-dash-muted text-xs">&mdash; {c.matricule}</span>
+                    </div>
+                  ))}
+                </div>
+                {createCarId && <p className="text-xs text-emerald-600">&check; {cars?.find(c => c._id === createCarId)?.marque} &mdash; {cars?.find(c => c._id === createCarId)?.matricule}</p>}
+              </div>
+
+              {/* Message */}
+              <div className="space-y-2">
+                <p className="text-xs text-dash-muted uppercase font-medium">Message <span className="text-red-500">*</span></p>
+                <textarea
+                  value={createMessage}
+                  onChange={(e) => setCreateMessage(e.target.value)}
+                  placeholder="Describe the issue in detail (min 10 characters)..."
+                  className="w-full min-h-[120px] p-3 rounded-xl border border-dash-border bg-white text-sm text-dash-text resize-none focus:outline-none focus:ring-1 focus:ring-dash-purple"
+                />
+                <p className={`text-[10px] ${createMessage.trim().length < 10 ? 'text-dash-muted' : 'text-emerald-600'}`}>
+                  {createMessage.trim().length}/10 characters minimum
+                </p>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-2">
+                <p className="text-xs text-dash-muted uppercase font-medium">Priority</p>
+                <div className="flex w-full rounded-lg overflow-hidden border border-dash-border p-1 gap-1 bg-dash-bg bg-opacity-50">
+                  <button type="button" onClick={() => setCreatePriority('LOW')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createPriority === 'LOW' ? 'bg-gray-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Low</button>
+                  <button type="button" onClick={() => setCreatePriority('MEDIUM')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createPriority === 'MEDIUM' ? 'bg-amber-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>Medium</button>
+                  <button type="button" onClick={() => setCreatePriority('HIGH')} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${createPriority === 'HIGH' ? 'bg-red-500 text-white shadow-sm' : 'text-dash-muted hover:bg-dash-bg'}`}>High</button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+          <div className="px-6 py-4 border-t border-dash-border flex justify-end gap-3 bg-white">
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="cursor-pointer border-dash-border">Cancel</Button>
+            <Button type="submit" form="create-reclamation-form" disabled={createReclamation.isPending} className="bg-dash-purple hover:bg-dash-purple/90 text-white cursor-pointer transition-all shadow-sm">
+              {createReclamation.isPending ? <Loader2 size={14} className="animate-spin mr-2" /> : null}Create Reclamation
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
