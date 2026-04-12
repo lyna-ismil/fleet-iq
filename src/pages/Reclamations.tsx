@@ -299,7 +299,7 @@ const Reclamations = () => {
                 </div>
                 {selectedDetail.image && (
                   <div className="mt-3">
-                    <img src={selectedDetail.image.startsWith('http') ? selectedDetail.image : `http://localhost:6005${selectedDetail.image}`} alt="Reclamation Attachment" className="w-full rounded-xl border border-dash-border max-h-64 object-cover" />
+                    <img src={selectedDetail.image.startsWith('http') ? selectedDetail.image : `${import.meta.env.VITE_RECLAMATION_SERVICE_URL || 'http://localhost:6001'}${selectedDetail.image}`} alt="Reclamation Attachment" className="w-full rounded-xl border border-dash-border max-h-64 object-cover" />
                   </div>
                 )}
               </div>

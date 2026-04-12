@@ -552,7 +552,7 @@ function UserDetailContent({ user, onToggleStatus, onToggleBlacklist }: { user: 
       <div className="flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-dash-purple/10 flex items-center justify-center overflow-hidden">
           {user.profilePhoto ? (
-            <img src={user.profilePhoto} alt={user.fullName} className="w-full h-full object-cover" />
+            <img src={user.profilePhoto.startsWith('http') || user.profilePhoto.startsWith('blob') ? user.profilePhoto : `${import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:6004'}${user.profilePhoto}`} alt={user.fullName} className="w-full h-full object-cover" />
           ) : (
             <span className="text-dash-purple text-xl font-bold">{user.fullName?.charAt(0)?.toUpperCase()}</span>
           )}

@@ -115,7 +115,7 @@ const Settings = () => {
   }
 
   const photoUrl = photoPreview
-    ? (photoPreview.startsWith('http') || photoPreview.startsWith('blob') ? photoPreview : `http://localhost:6001${photoPreview}`)
+    ? (photoPreview.startsWith('http') || photoPreview.startsWith('blob') ? photoPreview : `${import.meta.env.VITE_ADMIN_SERVICE_URL || 'http://localhost:6000'}${photoPreview}`)
     : null;
 
   return (

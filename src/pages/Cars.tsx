@@ -267,7 +267,7 @@ const Cars = () => {
                   <TableRow key={car._id} className="hover:bg-dash-bg/60 transition-colors cursor-pointer">
                     <TableCell>
                       {car.photo ? (
-                        <img src={car.photo.startsWith('http') ? car.photo : `http://localhost:6002${car.photo}`} alt={car.marque} className="w-10 h-8 object-cover rounded" />
+                        <img src={car.photo.startsWith('http') ? car.photo : `${import.meta.env.VITE_CAR_SERVICE_URL || 'http://localhost:6002'}${car.photo}`} alt={car.marque} className="w-10 h-8 object-cover rounded" />
                       ) : (
                         <div className="w-10 h-8 bg-dash-bg rounded flex items-center justify-center">
                           <CarIcon size={14} className="text-dash-muted" />
@@ -490,7 +490,7 @@ const Cars = () => {
                 <div className="space-y-3">
                   {photoPreview ? (
                     <div className="flex flex-col gap-2">
-                       <img src={photoPreview.startsWith('http') || photoPreview.startsWith('blob') || photoPreview.startsWith('data') ? photoPreview : `http://localhost:6002${photoPreview}`} alt="Preview" className="w-[160px] h-[120px] object-cover rounded-xl border border-dash-border" />
+                       <img src={photoPreview.startsWith('http') || photoPreview.startsWith('blob') || photoPreview.startsWith('data') ? photoPreview : `${import.meta.env.VITE_CAR_SERVICE_URL || 'http://localhost:6002'}${photoPreview}`} alt="Preview" className="w-[160px] h-[120px] object-cover rounded-xl border border-dash-border" />
                        <div className="flex gap-3">
                          <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoChange} className="hidden" />
                          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="cursor-pointer text-xs h-8">Change Photo</Button>
@@ -616,7 +616,7 @@ function CarDetailContent({ car, deviceStatuses, onEdit }: { car: Car; deviceSta
         {/* HEADER (Full Width Photo) */}
         <div className="relative w-full h-[200px] bg-dash-border/30 shrink-0">
           {car.photo ? (
-            <img src={car.photo.startsWith('http') || car.photo.startsWith('blob') || car.photo.startsWith('data') ? car.photo : `http://localhost:6002${car.photo}`} alt="Car" className="w-full h-full object-cover" />
+            <img src={car.photo.startsWith('http') || car.photo.startsWith('blob') || car.photo.startsWith('data') ? car.photo : `${import.meta.env.VITE_CAR_SERVICE_URL || 'http://localhost:6002'}${car.photo}`} alt="Car" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center bg-dash-bg text-dash-muted">
               <CarIcon size={48} className="opacity-20" />

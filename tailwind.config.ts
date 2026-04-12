@@ -82,7 +82,7 @@ export default {
         },
         // Dashboard design system
         dash: {
-          purple: "#6C5CE7",
+          purple: "#7C3AED",
           success: "#00B894",
           warning: "#FDCB6E",
           danger: "#D63031",
@@ -116,8 +116,8 @@ export default {
           "50%": { transform: "translateY(-20px)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(210 60% 55% / 0.2)" },
-          "50%": { boxShadow: "0 0 40px hsl(210 60% 55% / 0.4)" },
+          "0%, 100%": { boxShadow: "0 0 20px hsl(262 75% 68% / 0.2)" },
+          "50%": { boxShadow: "0 0 40px hsl(262 75% 68% / 0.4)" },
         },
         "data-flow": {
           "0%": { transform: "translateY(0) scale(1)", opacity: "1" },

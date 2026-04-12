@@ -117,7 +117,7 @@ const Header = () => {
             <button className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity">
               <div className="w-9 h-9 rounded-full bg-dash-purple/10 flex items-center justify-center overflow-hidden border border-dash-border">
                 {adminProfile?.photo ? (
-                  <img src={adminProfile.photo.startsWith('http') ? adminProfile.photo : `http://localhost:6001${adminProfile.photo}`} alt="Admin" className="w-full h-full object-cover" />
+                  <img src={adminProfile.photo.startsWith('http') ? adminProfile.photo : `${import.meta.env.VITE_ADMIN_SERVICE_URL || 'http://localhost:6000'}${adminProfile.photo}`} alt="Admin" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-dash-purple text-sm font-bold">{adminProfile?.name?.charAt(0)?.toUpperCase() || 'A'}</span>
                 )}

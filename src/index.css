@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 213 39% 15%;
 
-    --primary: 210 51% 36%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 30% 95%;
@@ -24,7 +24,7 @@
     --muted: 210 30% 95%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 210 55% 45%;
+    --accent: 262 70% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -32,18 +32,18 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 210 51% 36%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
     /* NexDrive brand tokens */
-    --nexdrive-navy-950: 220 80% 3%;
-    --nexdrive-navy-900: 224 48% 9%;
-    --nexdrive-navy-800: 217 54% 11%;
-    --nexdrive-navy-700: 215 28% 17%;
-    --nexdrive-blue: 210 51% 36%;
-    --nexdrive-blue-light: 210 47% 48%;
-    --nexdrive-blue-glow: 210 60% 55%;
+    --nexdrive-navy-950: 270 80% 3%;
+    --nexdrive-navy-900: 270 48% 9%;
+    --nexdrive-navy-800: 268 54% 11%;
+    --nexdrive-navy-700: 265 28% 17%;
+    --nexdrive-blue: 262 83% 58%;
+    --nexdrive-blue-light: 262 70% 65%;
+    --nexdrive-blue-glow: 262 75% 68%;
     --nexdrive-surface-1: 0 0% 100%;
     --nexdrive-surface-2: 213 47% 97%;
     --nexdrive-surface-3: 213 35% 95%;
@@ -51,14 +51,14 @@
     --font-heading: 'Space Grotesk', sans-serif;
     --font-body: 'DM Sans', sans-serif;
 
-    --gradient-brand: linear-gradient(135deg, hsl(210, 51%, 36%) 0%, hsl(210, 47%, 48%) 50%, hsl(210, 60%, 55%) 100%);
-    --gradient-brand-dark: linear-gradient(135deg, hsl(220, 80%, 3%) 0%, hsl(217, 54%, 11%) 100%);
-    --gradient-premium: linear-gradient(135deg, hsl(210, 51%, 36%) 0%, hsl(210, 55%, 45%) 40%, hsl(200, 60%, 50%) 100%);
-    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.9) 0%, hsl(210 30% 98% / 0.7) 100%);
-    --shadow-glow: 0 0 40px hsl(210 60% 55% / 0.3);
-    --shadow-premium: 0 8px 32px hsl(210 51% 36% / 0.12), 0 2px 8px hsl(210 51% 36% / 0.08);
-    --shadow-card: 0 4px 24px hsl(210 51% 36% / 0.08);
-    --shadow-card-hover: 0 20px 60px hsl(210 51% 36% / 0.18), 0 4px 16px hsl(210 51% 36% / 0.1);
+    --gradient-brand: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(262, 70%, 65%) 50%, hsl(262, 75%, 68%) 100%);
+    --gradient-brand-dark: linear-gradient(135deg, hsl(270, 80%, 3%) 0%, hsl(268, 54%, 11%) 100%);
+    --gradient-premium: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(262, 70%, 50%) 40%, hsl(280, 60%, 55%) 100%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.9) 0%, hsl(262 30% 98% / 0.7) 100%);
+    --shadow-glow: 0 0 40px hsl(262 75% 68% / 0.3);
+    --shadow-premium: 0 8px 32px hsl(262 83% 58% / 0.12), 0 2px 8px hsl(262 83% 58% / 0.08);
+    --shadow-card: 0 4px 24px hsl(262 83% 58% / 0.08);
+    --shadow-card-hover: 0 20px 60px hsl(262 83% 58% / 0.18), 0 4px 16px hsl(262 83% 58% / 0.1);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -77,19 +77,19 @@
     --card-foreground: 210 40% 98%;
     --popover: 217 54% 11%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 47% 48%;
+    --primary: 262 70% 65%;
     --primary-foreground: 0 0% 100%;
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
     --muted: 215 28% 17%;
     --muted-foreground: 215 20% 65%;
-    --accent: 210 55% 45%;
+    --accent: 262 70% 50%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
     --border: 215 28% 17%;
     --input: 215 28% 17%;
-    --ring: 210 47% 48%;
+    --ring: 262 70% 65%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

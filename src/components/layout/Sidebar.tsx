@@ -111,7 +111,7 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
           collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5')}>
           {user?.photo ? (
             <img 
-              src={user.photo.startsWith('/uploads') ? `${import.meta.env.VITE_ADMIN_SERVICE_URL || 'http://localhost:6001'}${user.photo}` : user.photo} 
+              src={user.photo.startsWith('http') || user.photo.startsWith('blob') ? user.photo : `${import.meta.env.VITE_ADMIN_SERVICE_URL || 'http://localhost:6000'}${user.photo}`} 
               alt="Admin" 
               className="w-8 h-8 rounded-full object-cover flex-shrink-0" 
             />
