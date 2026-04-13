@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDevices, useRegisterDevice, usePairDevice, useDeleteDevice, useUpdateDeviceStatus, useUpdateDevice, useDeviceStatuses, type Device } from '@/hooks/useDevices';
+import { useDevices, useRegisterDevice, usePairDevice, useUnpairDevice, useDeleteDevice, useUpdateDeviceStatus, useUpdateDevice, useDeviceStatuses, type Device } from '@/hooks/useDevices';
 import { useCars } from '@/hooks/useCars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -40,6 +40,7 @@ const Devices = () => {
   const { data: deviceStatuses } = useDeviceStatuses();
   const registerDevice = useRegisterDevice();
   const pairDevice = usePairDevice();
+  const unpairDevice = useUnpairDevice();
   const deleteDevice = useDeleteDevice();
   const updateDeviceStatus = useUpdateDeviceStatus();
   const updateDevice = useUpdateDevice();
@@ -64,8 +65,18 @@ const Devices = () => {
   const onRegister = async (data: DeviceFormData) => {
     try {
       const payload: any = { ...data, status: createStatus };
-      if (payload.carId === '' || payload.carId === 'none') delete payload.carId;
-      await registerDevice.mutateAsync(payload);
+      const initialCarId = payload.carId;
+      
+      // Remove carId from payload to prevent backend from saving it out-of-sync
+      delete payload.carId;
+
+      const response = await registerDevice.mutateAsync(payload);
+      
+      if (initialCarId && initialCarId !== 'none') {
+        // Use explicit route to trigger cross-service synchronization
+        await pairDevice.mutateAsync({ id: response.device._id, carId: initialCarId });
+      }
+
       toast.success('Device registered successfully');
       setRegisterOpen(false);
       reset();
@@ -106,8 +117,19 @@ const Devices = () => {
         id: editingDevice._id,
         status: editStatus,
         firmwareVersion: editFirmware,
-        carId: editCarId || null // Send null to unpair if empty
       });
+
+      const oldCarId = editingDevice.carId || '';
+      const newCarId = editCarId || '';
+
+      if (oldCarId !== newCarId) {
+        if (newCarId) {
+          await pairDevice.mutateAsync({ id: editingDevice._id, carId: newCarId });
+        } else {
+          await unpairDevice.mutateAsync(editingDevice._id);
+        }
+      }
+
       toast.success('Device updated successfully');
       setEditingDevice(null);
     } catch {
@@ -117,7 +139,7 @@ const Devices = () => {
 
   const handleUnpair = async (deviceId: string) => {
     try {
-      await pairDevice.mutateAsync({ id: deviceId, carId: '' });
+      await unpairDevice.mutateAsync(deviceId);
       toast.success('Device unpaired successfully');
     } catch {
       toast.error('Failed to unpair device');

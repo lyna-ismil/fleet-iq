@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useFleetTelemetry, type TelemetrySnapshot } from '@/hooks/useFleetMap';
 import { useDeviceStatuses, type DeviceStatus } from '@/hooks/useDevices';
+import { useCars } from '@/hooks/useCars';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +66,7 @@ function getMarkerStatus(
 
 const FleetMap = () => {
   const navigate = useNavigate();
+  const { data: cars, isLoading: carsLoading } = useCars();
   const { data: telemetry, isLoading: telLoading, refetch: refetchTel } = useFleetTelemetry();
   const { data: deviceStatuses } = useDeviceStatuses();
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -77,9 +79,30 @@ const FleetMap = () => {
     return () => clearInterval(interval);
   }, [refetchTel]);
 
-  const markers = (telemetry || []).map(s => {
-    const status = getMarkerStatus(s, deviceStatuses || []);
-    return { ...s, markerStatus: status };
+  const pairedCars = (cars || []).filter(c => c.deviceId != null);
+
+  const markers = pairedCars.map(car => {
+    const snapshot = (telemetry || []).find(t => t.carId === car._id);
+    
+    // Construct a faux snapshot if none exists or enrich the existing one with car data
+    const enrichedSnapshot: TelemetrySnapshot = snapshot || {
+      _id: `faux-${car._id}`,
+      carId: car._id,
+      deviceId: car.deviceId!,
+      ts: new Date(0).toISOString(),
+      payload: { gps: car.lastKnownLocation },
+    };
+
+    // Ensure car data is always attached for filters
+    enrichedSnapshot.car = {
+      _id: car._id,
+      marque: car.marque,
+      matricule: car.matricule,
+      availability: car.availability,
+    };
+
+    const status = getMarkerStatus(enrichedSnapshot, deviceStatuses || []);
+    return { ...enrichedSnapshot, markerStatus: status };
   });
 
   const filteredMarkers = markers.filter(m => {
@@ -188,7 +211,7 @@ const FleetMap = () => {
 
         {/* Map */}
         <div className="flex-1 rounded-xl overflow-hidden border border-dash-border relative h-full">
-          {telLoading ? (
+          {telLoading || carsLoading ? (
             <div className="w-full h-full flex items-center justify-center bg-dash-bg">
               <div className="text-center space-y-3">
                 <Skeleton className="h-8 w-48 mx-auto" />

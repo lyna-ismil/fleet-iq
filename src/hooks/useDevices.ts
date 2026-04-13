@@ -46,6 +46,17 @@ export function usePairDevice() {
   });
 }
 
+export function useUnpairDevice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post(`/devices/${id}/unpair`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['devices'] }),
+  });
+}
+
 export function useDeleteDevice() {
   const qc = useQueryClient();
   return useMutation({
