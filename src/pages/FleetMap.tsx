@@ -21,13 +21,14 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-type MarkerStatus = 'connected' | 'rented' | 'disconnected' | 'no-gps';
+type MarkerStatus = 'connected' | 'rented' | 'disconnected' | 'no-gps' | 'unpaired';
 
 const statusConfig: Record<MarkerStatus, { color: string; label: string; bg: string }> = {
   'connected': { color: '#22c55e', label: 'Connected & Available', bg: 'bg-emerald-500' },
   'rented': { color: '#f97316', label: 'Rented', bg: 'bg-orange-500' },
   'disconnected': { color: '#ef4444', label: 'Disconnected', bg: 'bg-red-500' },
   'no-gps': { color: '#6b7280', label: 'No GPS Data', bg: 'bg-gray-500' },
+  'unpaired': { color: '#8b5cf6', label: 'Unpaired', bg: 'bg-dash-purple' },
 };
 
 const createCarIcon = (color: string) => {
@@ -42,22 +43,33 @@ const createCarIcon = (color: string) => {
   });
 };
 
-const GPS_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+// Helper to parse manually typed "lat, lng" strings from the location field
+const parseLocationString = (locStr?: string) => {
+  if (!locStr) return undefined;
+  const parts = locStr.split(',');
+  if (parts.length === 2) {
+    const lat = parseFloat(parts[0].trim());
+    const lng = parseFloat(parts[1].trim());
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+  return undefined;
+};
 
 function getMarkerStatus(
   snapshot: TelemetrySnapshot,
   deviceStatuses: DeviceStatus[]
 ): MarkerStatus {
-  if (!snapshot.payload?.gps) return 'no-gps';
+  // 1. Unpaired
+  if (!snapshot.deviceId) return 'unpaired';
 
-  const ts = new Date(snapshot.ts).getTime();
-  if (Date.now() - ts > GPS_TIMEOUT_MS) return 'no-gps';
-
+  // 2. Connection status
   const deviceStatus = deviceStatuses.find(d => d.deviceId === snapshot.deviceId);
   const isConnected = deviceStatus?.isConnected ?? false;
-
   if (!isConnected) return 'disconnected';
 
+  // 3. Rented vs Available
   const avail = snapshot.car?.availability?.status;
   if (avail === 'RESERVED' || avail === 'IN_USE') return 'rented';
 
@@ -79,18 +91,18 @@ const FleetMap = () => {
     return () => clearInterval(interval);
   }, [refetchTel]);
 
-  const pairedCars = (cars || []).filter(c => c.deviceId != null);
-
-  const markers = pairedCars.map(car => {
+  const markers = (cars || []).map(car => {
     const snapshot = (telemetry || []).find(t => t.carId === car._id);
     
-    // Construct a faux snapshot if none exists or enrich the existing one with car data
+    // Parse fallback GPS from either lastKnownLocation or the string location field
+    const fallbackGps = car.lastKnownLocation || parseLocationString(car.location);
+
     const enrichedSnapshot: TelemetrySnapshot = snapshot || {
       _id: `faux-${car._id}`,
       carId: car._id,
-      deviceId: car.deviceId!,
+      deviceId: car.deviceId || '',
       ts: new Date(0).toISOString(),
-      payload: { gps: car.lastKnownLocation },
+      payload: { gps: fallbackGps },
     };
 
     // Ensure car data is always attached for filters
@@ -114,6 +126,7 @@ const FleetMap = () => {
     if (connectionFilter !== 'all') {
       if (connectionFilter === 'connected' && m.markerStatus !== 'connected' && m.markerStatus !== 'rented') return false;
       if (connectionFilter === 'disconnected' && m.markerStatus !== 'disconnected') return false;
+      if (connectionFilter === 'unpaired' && m.markerStatus !== 'unpaired') return false;
     }
     return true;
   });
@@ -126,7 +139,8 @@ const FleetMap = () => {
   const connectedCount = markers.filter(m => m.markerStatus === 'connected' || m.markerStatus === 'rented').length;
   const disconnectedCount = markers.filter(m => m.markerStatus === 'disconnected').length;
   const noGpsCount = markers.filter(m => m.markerStatus === 'no-gps').length;
-  const noGpsCars = filteredMarkers.filter(m => m.markerStatus === 'no-gps');
+  const unpairedCount = markers.filter(m => m.markerStatus === 'unpaired').length;
+  const noGpsCars = filteredMarkers.filter(m => !m.payload?.gps);
 
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-8rem)] font-inter">
@@ -153,6 +167,7 @@ const FleetMap = () => {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="connected">Connected</SelectItem>
                   <SelectItem value="disconnected">Disconnected</SelectItem>
+                  <SelectItem value="unpaired">Unpaired</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -171,6 +186,10 @@ const FleetMap = () => {
             <div className="flex flex-col items-center">
               <div className="flex justify-center items-center gap-1.5 text-dash-muted font-semibold text-lg"><Navigation size={16} />{noGpsCount}</div>
               <span className="text-[10px] uppercase text-dash-muted font-medium">No GPS</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="flex justify-center items-center gap-1.5 text-violet-500 font-semibold text-lg"><Car size={16} />{unpairedCount}</div>
+              <span className="text-[10px] uppercase text-dash-muted font-medium">Unpaired</span>
             </div>
           </div>
         </CardContent>
@@ -250,8 +269,8 @@ const FleetMap = () => {
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Connection:</span>
-                            <span className={m.markerStatus === 'connected' || m.markerStatus === 'rented' ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
-                              {m.markerStatus === 'connected' || m.markerStatus === 'rented' ? '● Connected' : '● Disconnected'}
+                            <span className={m.markerStatus === 'connected' || m.markerStatus === 'rented' ? 'text-emerald-600 font-bold' : (m.markerStatus === 'unpaired' ? 'text-dash-purple font-bold' : 'text-red-600 font-bold')}>
+                              {m.markerStatus === 'connected' || m.markerStatus === 'rented' ? '● Connected' : (m.markerStatus === 'unpaired' ? '● Unpaired' : '● Disconnected')}
                             </span>
                           </div>
                           {m.payload.speed != null && (

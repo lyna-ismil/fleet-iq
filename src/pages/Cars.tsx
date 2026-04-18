@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCars, useCreateCar, useUpdateCar, useDeleteCar, useUpdateCarStatus, type Car } from '@/hooks/useCars';
 import { useDeviceStatuses } from '@/hooks/useDevices';
 import { useCarBookings, type Booking } from '@/hooks/useBookings';
@@ -592,6 +592,7 @@ const bookingStatusColors: Record<string, string> = {
 };
 
 function CarDetailContent({ car, deviceStatuses, onEdit }: { car: Car; deviceStatuses: any[]; onEdit: () => void; }) {
+  const navigate = useNavigate();
   const { data: bookings, isLoading: bookingsLoading } = useCarBookings(car._id);
   const device = deviceStatuses.find(d => d.deviceId === car.deviceId);
 
@@ -740,9 +741,9 @@ function CarDetailContent({ car, deviceStatuses, onEdit }: { car: Car; deviceSta
                <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl shadow-sm space-y-3 relative overflow-hidden">
                  <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none"></div>
                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center text-dash-purple font-bold text-xs">{(activeBooking as any).userName?.charAt(0) || '?'}</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-dash-text">{(activeBooking as any).userName || 'Unknown User'}</p>
+                     <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center text-dash-purple font-bold text-xs">{((activeBooking as any).user?.fullName || '?').charAt(0).toUpperCase()}</div>
+                     <div className="flex-1">
+                       <p className="text-sm font-semibold text-dash-text">{(activeBooking as any).user?.fullName || 'Unknown User'}</p>
                       <p className="text-xs text-dash-muted">{new Date(activeBooking.startDate).toLocaleDateString()} &rarr; {new Date(activeBooking.endDate).toLocaleDateString()}</p>
                     </div>
                     <Badge className={bookingStatusColors[activeBooking.status]}>{activeBooking.status}</Badge>
@@ -757,17 +758,30 @@ function CarDetailContent({ car, deviceStatuses, onEdit }: { car: Car; deviceSta
              {bookingsLoading ? (
                <div className="space-y-2">{[...Array(2)].map((_, idx) => <Skeleton key={idx} className="h-10 w-full rounded-xl" />)}</div>
              ) : bookings && bookings.length > 0 ? (
-               <div className="bg-white border border-dash-border rounded-xl shadow-sm overflow-hidden">
+               <div className="bg-white border border-dash-border rounded-xl shadow-sm overflow-hidden max-h-[300px] overflow-y-auto">
                  <Table>
                    <TableBody>
-                     {bookings.slice(0, 5).map((b: any) => (
+                     {bookings.map((b: any) => (
                        <TableRow key={b._id} className="hover:bg-dash-bg/50">
-                         <TableCell className="py-2 px-3">
-                           <p className="text-xs font-medium text-dash-text">{b.userName || 'User'}</p>
-                           <p className="text-[10px] text-dash-muted">{new Date(b.startDate).toLocaleDateString()} - {new Date(b.endDate).toLocaleDateString()}</p>
+                         <TableCell className="py-3 px-3">
+                           <div className="flex items-center gap-3">
+                             <div className="w-8 h-8 rounded-full bg-dash-purple/10 flex items-center justify-center flex-shrink-0">
+                               <span className="text-dash-purple text-[10px] font-bold">{(b.user?.fullName || '?').charAt(0).toUpperCase()}</span>
+                             </div>
+                             <div>
+                               <p 
+                                 className="text-xs font-bold text-dash-text cursor-pointer hover:underline hover:text-dash-purple"
+                                 onClick={() => navigate('/dashboard/users', { state: { openUserId: b.userId } })}
+                               >
+                                 {b.user?.fullName || b.userId.slice(-6)}
+                               </p>
+                               <p className="text-[10px] text-dash-muted mt-0.5">{new Date(b.startDate).toLocaleDateString()} &rarr; {new Date(b.endDate).toLocaleDateString()}</p>
+                             </div>
+                           </div>
                          </TableCell>
-                         <TableCell className="py-2 px-3 text-right">
-                           <Badge variant="outline" className={`text-[9px] ${bookingStatusColors[b.status]}`}>{b.status}</Badge>
+                         <TableCell className="py-3 px-3 text-right">
+                           <p className="text-[11px] font-bold text-dash-text mb-1">{b.payment?.amount ? `${b.payment.amount} ${b.payment.currency || 'TND'}` : '—'}</p>
+                           <Badge variant="outline" className={`text-[9px] font-semibold border ${bookingStatusColors[b.status] || 'bg-gray-100 text-gray-600'}`}>{b.status}</Badge>
                          </TableCell>
                        </TableRow>
                      ))}
